@@ -1,0 +1,49 @@
+const mongoose = require("mongoose");
+
+const powerballResultSchema = new mongoose.Schema(
+  {
+    gamePoolId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AustraliaGamePool",
+      required: true,
+      unique: true,
+    },
+
+    drawNo: {
+      type: Number,
+      required: true,
+    },
+
+    numbers: {
+      type: [Number],
+      required: true,
+      validate: {
+        validator: (arr) => arr.length === 7,
+        message: "Winning result must contain exactly 7 numbers.",
+      },
+    },
+
+    powerball: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 20,
+    },
+
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "users",
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+powerballResultSchema.index({ gamePoolId: 1 });
+powerballResultSchema.index({ drawNo: 1 });
+
+module.exports = mongoose.model(
+  "AustraliaPowerballResult",
+  powerballResultSchema
+);
