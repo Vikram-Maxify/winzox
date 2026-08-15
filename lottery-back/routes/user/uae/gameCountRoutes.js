@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { getGameCounts } = require("../../../controllers/user/uae/UaeGameCountController");
+const { getGameCounts } = require("../../../controllers/user/uae/UAEGameCountController");
 
 router.get("/", getGameCounts);
 

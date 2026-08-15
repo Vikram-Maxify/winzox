@@ -7,7 +7,7 @@ const {
   getSingleGameEntry,
   deleteGameEntry,
   cancelGameEntry,
-} = require("../../../controllers/user/uae/UaeGamePoolController");
+} = require("../../../controllers/user/uae/UAEGamePoolController");
 
 const { protect } = require("../../../middleware/authMiddleware");
 
