@@ -14,8 +14,8 @@ const marketSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
-    gameType: {
-      type: String,
+  gameTypes: {
+      type: [String],
       enum: [
         "single",
         "jodi",

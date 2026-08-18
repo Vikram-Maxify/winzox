@@ -1,12 +1,12 @@
 const Market = require("../models/Market");
 
-// Create Market (Admin Only)
+// Create Market (Admin Only) - Now supports multiple game types
 exports.createMarket = async (req, res) => {
   try {
     const {
       name,
       marketId,
-      gameType,
+      gameTypes, // Changed from gameType to gameTypes (array)
       openTime,
       closeTime,
       resultTime,
@@ -26,12 +26,25 @@ exports.createMarket = async (req, res) => {
       "first-digit",
     ];
 
-    if (!allowedGameTypes.includes(gameType)) {
+    // Validate gameTypes is an array and not empty
+    if (!gameTypes || !Array.isArray(gameTypes) || gameTypes.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Invalid game type",
+        message: "At least one game type is required",
       });
     }
+
+    // Check if all game types are valid
+    const invalidTypes = gameTypes.filter(type => !allowedGameTypes.includes(type));
+    if (invalidTypes.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid game type(s): ${invalidTypes.join(", ")}`,
+      });
+    }
+
+    // Remove duplicates if any
+    const uniqueGameTypes = [...new Set(gameTypes)];
 
     const existingMarket = await Market.findOne({
       $or: [
@@ -50,7 +63,7 @@ exports.createMarket = async (req, res) => {
     const market = await Market.create({
       name: name.trim(),
       marketId: marketId.trim(),
-      gameType,
+      gameTypes: uniqueGameTypes, // Store as array
       openTime,
       closeTime,
       resultTime,
@@ -76,7 +89,7 @@ exports.createMarket = async (req, res) => {
   }
 };
 
-// Update Market (Admin Only)
+// Update Market (Admin Only) - Supports multiple game types
 exports.updateMarket = async (req, res) => {
   try {
     const { marketId } = req.params;
@@ -91,14 +104,25 @@ exports.updateMarket = async (req, res) => {
       "first-digit",
     ];
 
-    if (
-      req.body.gameType &&
-      !allowedGameTypes.includes(req.body.gameType)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid game type",
-      });
+    // Validate gameTypes if provided
+    if (req.body.gameTypes) {
+      if (!Array.isArray(req.body.gameTypes) || req.body.gameTypes.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "gameTypes must be a non-empty array",
+        });
+      }
+
+      const invalidTypes = req.body.gameTypes.filter(type => !allowedGameTypes.includes(type));
+      if (invalidTypes.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid game type(s): ${invalidTypes.join(", ")}`,
+        });
+      }
+
+      // Remove duplicates
+      req.body.gameTypes = [...new Set(req.body.gameTypes)];
     }
 
     if (req.body.name) {
@@ -162,14 +186,18 @@ exports.updateMarket = async (req, res) => {
   }
 };
 
-// Get all markets
+// Get all markets - Updated to handle multiple game types
 exports.getAllMarkets = async (req, res) => {
   try {
     const { isActive, gameType, page = 1, limit = 20 } = req.query;
 
     const filter = {};
     if (isActive !== undefined) filter.isActive = isActive === "true";
-    if (gameType) filter.gameType = gameType;
+    
+    // If gameType is provided, filter markets that include this game type
+    if (gameType) {
+      filter.gameTypes = { $in: [gameType] };
+    }
 
     const markets = await Market.find(filter)
       .populate("createdBy", "name email")
@@ -220,7 +248,6 @@ exports.getMarketById = async (req, res) => {
   }
 };
 
-
 // Toggle market status (Admin Only)
 exports.toggleMarketStatus = async (req, res) => {
   try {
@@ -250,13 +277,13 @@ exports.toggleMarketStatus = async (req, res) => {
   }
 };
 
-// Get active markets for user
+// Get active markets for user - Returns all game types for each market
 exports.getActiveMarkets = async (req, res) => {
   try {
     const markets = await Market.find({
       isActive: true,
       isResultDeclared: false,
-    }).select("name marketId gameType openTime closeTime minBid maxBid");
+    }).select("name marketId gameTypes openTime closeTime minBid maxBid");
 
     res.json({
       success: true,
