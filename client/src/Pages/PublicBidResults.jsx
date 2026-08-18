@@ -171,13 +171,13 @@ const LiveResults = () => {
             {POWERBALL_MOCK.map((draw) => (
               <div
                 key={draw.id}
-                className="border border-gray-100 rounded-xl px-3 py-3 text-center"
+                className="border border-gray-100 rounded-xl px-1 py-3 text-center"
               >
                 <p className="text-xs font-bold text-gray-800">{draw.title}</p>
                 <p className="text-[10px] text-gray-400 mb-2">
                   Draw #{draw.drawNo}
                 </p>
-                <div className="flex items-center justify-center gap-1.5 mb-2 flex-wrap">
+                <div className="flex items-center justify-center gap-1.5 mb-2">
                   {draw.balls.map((b, idx) => (
                     <span
                       key={idx}
