@@ -1,28 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { format } from "date-fns";
+import { useEffect } from "react";
+import { FaChevronLeft, FaChevronRight, FaTrophy } from "react-icons/fa";
+import { useDispatch, useSelector } from "react-redux";
 import {
   fetchPublicBidResults,
-  setFilter,
+  selectPublicBidResults,
   setPage,
-  resetFilters,
-  selectPublicBidResults
-} from '../redux/slices/publicBidSlice';
-import { format } from 'date-fns';
-import { 
-  FaTrophy, 
-  FaChevronLeft,
-  FaChevronRight
-} from 'react-icons/fa';
+} from "../redux/slices/publicBidSlice";
 
 const PublicBidResults = () => {
   const dispatch = useDispatch();
-  const {
-    results,
-    pagination,
-    loading,
-    error,
-    filters
-  } = useSelector(selectPublicBidResults);
+  const { results, pagination, loading, error, filters } = useSelector(
+    selectPublicBidResults,
+  );
 
   useEffect(() => {
     dispatch(fetchPublicBidResults(filters));
@@ -36,36 +26,36 @@ const PublicBidResults = () => {
 
   const getGameTypeColor = (gameType) => {
     const colors = {
-      single: 'bg-blue-100 text-blue-800',
-      jodi: 'bg-green-100 text-green-800',
-      panna: 'bg-purple-100 text-purple-800',
-      'half-sangam': 'bg-yellow-100 text-yellow-800',
-      'full-sangam': 'bg-red-100 text-red-800',
-      'last-digit': 'bg-indigo-100 text-indigo-800',
-      'first-digit': 'bg-pink-100 text-pink-800'
+      single: "bg-blue-100 text-blue-800",
+      jodi: "bg-green-100 text-green-800",
+      panna: "bg-purple-100 text-purple-800",
+      "half-sangam": "bg-yellow-100 text-yellow-800",
+      "full-sangam": "bg-red-100 text-red-800",
+      "last-digit": "bg-indigo-100 text-indigo-800",
+      "first-digit": "bg-pink-100 text-pink-800",
     };
-    return colors[gameType] || 'bg-gray-100 text-gray-800';
+    return colors[gameType] || "bg-gray-100 text-gray-800";
   };
 
   const getStatusColor = (status) => {
     const colors = {
-      won: 'bg-green-100 text-green-800',
-      lost: 'bg-red-100 text-red-800',
-      pending: 'bg-yellow-100 text-yellow-800',
-      cancelled: 'bg-gray-100 text-gray-800'
+      won: "bg-green-100 text-green-800",
+      lost: "bg-red-100 text-red-800",
+      pending: "bg-yellow-100 text-yellow-800",
+      cancelled: "bg-gray-100 text-gray-800",
     };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    return colors[status] || "bg-gray-100 text-gray-800";
   };
 
   const getGameTypeLabel = (type) => {
     const labels = {
-      single: 'Single',
-      jodi: 'Jodi',
-      panna: 'Panna',
-      'half-sangam': 'Half Sangam',
-      'full-sangam': 'Full Sangam',
-      'last-digit': 'Last Digit',
-      'first-digit': 'First Digit'
+      single: "Single",
+      jodi: "Jodi",
+      panna: "Panna",
+      "half-sangam": "Half Sangam",
+      "full-sangam": "Full Sangam",
+      "last-digit": "Last Digit",
+      "first-digit": "First Digit",
     };
     return labels[type] || type;
   };
@@ -95,31 +85,51 @@ const PublicBidResults = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Game</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bid Amount</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Win Amount</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Number
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Game
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Bid Amount
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Win Amount
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {results.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-4 py-6 text-center text-gray-500">
+                    <td
+                      colSpan="6"
+                      className="px-4 py-6 text-center text-gray-500"
+                    >
                       No results found
                     </td>
                   </tr>
                 ) : (
                   results.map((bid) => (
-                    <tr key={bid._id} className="hover:bg-gray-50 transition-colors">
+                    <tr
+                      key={bid._id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className="text-base font-bold text-gray-900">
                           {bid.number}
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getGameTypeColor(bid.gameType)}`}>
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${getGameTypeColor(bid.gameType)}`}
+                        >
                           {getGameTypeLabel(bid.gameType)}
                         </span>
                       </td>
@@ -128,20 +138,22 @@ const PublicBidResults = () => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className="text-sm font-bold text-green-600">
-                          ₹{bid.winAmount?.toLocaleString() || '0'}
+                          ₹{bid.winAmount?.toLocaleString() || "0"}
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(bid.status)}`}>
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(bid.status)}`}
+                        >
                           {bid.status}
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="text-sm text-gray-500">
-                          {format(new Date(bid.createdAt), 'dd/MM/yyyy')}
+                          {format(new Date(bid.createdAt), "dd/MM/yyyy")}
                         </div>
                         <div className="text-xs text-gray-400">
-                          {format(new Date(bid.createdAt), 'HH:mm')}
+                          {format(new Date(bid.createdAt), "HH:mm")}
                         </div>
                       </td>
                     </tr>
@@ -155,9 +167,12 @@ const PublicBidResults = () => {
           {pagination.totalPages > 1 && (
             <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="text-xs text-gray-700">
-                Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
-                {Math.min(pagination.page * pagination.limit, pagination.totalCount)} of{' '}
-                {pagination.totalCount} results
+                Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+                {Math.min(
+                  pagination.page * pagination.limit,
+                  pagination.totalCount,
+                )}{" "}
+                of {pagination.totalCount} results
               </div>
               <div className="flex items-center gap-2">
                 <button
