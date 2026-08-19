@@ -20,10 +20,6 @@ const GAME_TYPES = [
 
 const resultSchema = new mongoose.Schema(
   {
-    // ======================================================
-    // MARKET
-    // ======================================================
-
     marketId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "markets",
@@ -37,13 +33,6 @@ const resultSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // ======================================================
-    // GAME TYPE
-    // IMPORTANT:
-    // Market has gameTypes[]
-    // Result has ONE gameType
-    // ======================================================
-
     gameType: {
       type: String,
       enum: GAME_TYPES,
@@ -52,10 +41,6 @@ const resultSchema = new mongoose.Schema(
       index: true,
     },
 
-    // ======================================================
-    // WINNING NUMBER
-    // ======================================================
-
     winningNumber: {
       type: String,
       required: true,
@@ -63,68 +48,27 @@ const resultSchema = new mongoose.Schema(
 
       validate: {
         validator: function (value) {
+          if (!this.gameType) {
+            return true;
+          }
+
           const str = String(value).trim();
 
           switch (this.gameType) {
-            // ----------------------------------------------
-            // SINGLE
-            // 0 - 9
-            // ----------------------------------------------
-
             case "single":
               return /^[0-9]$/.test(str);
-
-            // ----------------------------------------------
-            // JODI
-            // 00 - 99
-            // ----------------------------------------------
-
             case "jodi":
-              return /^[0-9]{2}$/.test(str);
-
-            // ----------------------------------------------
-            // PANNA
-            // 000 - 999
-            // ----------------------------------------------
-
+              return /^[0-9]{1,2}$/.test(str);
             case "panna":
-              return /^[0-9]{3}$/.test(str);
-
-            // ----------------------------------------------
-            // HALF SANGAM
-            // 1 digit OR 3 digit
-            // ----------------------------------------------
-
+              return /^[0-9]{1,3}$/.test(str);
             case "half-sangam":
-              return (
-                /^[0-9]$/.test(str) ||
-                /^[0-9]{3}$/.test(str)
-              );
-
-            // ----------------------------------------------
-            // FULL SANGAM
-            // 2 digit
-            // ----------------------------------------------
-
+              return /^[0-9]{1,3}$/.test(str);
             case "full-sangam":
-              return /^[0-9]{2}$/.test(str);
-
-            // ----------------------------------------------
-            // LAST DIGIT
-            // 2 digit
-            // ----------------------------------------------
-
+              return /^[0-9]{1,2}$/.test(str);
             case "last-digit":
-              return /^[0-9]{2}$/.test(str);
-
-            // ----------------------------------------------
-            // FIRST DIGIT
-            // 2 digit
-            // ----------------------------------------------
-
+              return /^[0-9]{1,2}$/.test(str);
             case "first-digit":
-              return /^[0-9]{2}$/.test(str);
-
+              return /^[0-9]{1,2}$/.test(str);
             default:
               return false;
           }
@@ -135,29 +79,20 @@ const resultSchema = new mongoose.Schema(
             single: "single digit (0-9)",
             jodi: "2-digit number (00-99)",
             panna: "3-digit number (000-999)",
-            "half-sangam":
-              "1-digit or 3-digit number",
-            "full-sangam":
-              "2-digit number (00-99)",
-            "last-digit":
-              "2-digit number (00-99)",
-            "first-digit":
-              "2-digit number (00-99)",
+            "half-sangam": "1-digit or 3-digit number",
+            "full-sangam": "2-digit number (00-99)",
+            "last-digit": "2-digit number (00-99)",
+            "first-digit": "2-digit number (00-99)",
           };
 
           return `Invalid winning number for ${
             this.gameType || "selected game"
           }. Expected format: ${
-            gameTypeMap[this.gameType] ||
-            "valid number"
+            gameTypeMap[this.gameType] || "valid number"
           }`;
         },
       },
     },
-
-    // ======================================================
-    // EXTRACTED DIGITS
-    // ======================================================
 
     winningLastDigit: {
       type: String,
@@ -169,29 +104,17 @@ const resultSchema = new mongoose.Schema(
       default: null,
     },
 
-    // ======================================================
-    // RESULT DATE
-    // ======================================================
-
     resultDate: {
       type: Date,
       required: true,
       index: true,
     },
 
-    // ======================================================
-    // DECLARED BY
-    // ======================================================
-
     declaredBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "users",
       required: true,
     },
-
-    // ======================================================
-    // BID STATISTICS
-    // ======================================================
 
     totalBids: {
       type: Number,
@@ -211,24 +134,12 @@ const resultSchema = new mongoose.Schema(
       min: 0,
     },
 
-    // ======================================================
-    // STATUS
-    // ======================================================
-
     status: {
       type: String,
-      enum: [
-        "pending",
-        "declared",
-        "cancelled",
-      ],
+      enum: ["pending", "declared", "cancelled"],
       default: "declared",
       index: true,
     },
-
-    // ======================================================
-    // REMARKS
-    // ======================================================
 
     remarks: {
       type: String,
@@ -242,79 +153,59 @@ const resultSchema = new mongoose.Schema(
 );
 
 // ==========================================================
-// PRE-SAVE MIDDLEWARE
+// PRE-SAVE MIDDLEWARE - FIXED
 // ==========================================================
 
-resultSchema.pre("save", function (next) {
+resultSchema.pre('save', function(next) {
+  // Make sure next is a function
+  if (typeof next !== 'function') {
+    // If next is not a function, we need to handle this differently
+    // This shouldn't happen, but just in case
+    console.error('next is not a function in pre-save middleware');
+    return;
+  }
+
   try {
-    if (
-      this.winningNumber === undefined ||
-      this.winningNumber === null
-    ) {
+    // If winningNumber is missing, skip
+    if (!this.winningNumber) {
       return next();
     }
 
     let str = String(this.winningNumber).trim();
 
-    // ======================================================
-    // FORMAT NUMBER
-    // ======================================================
-
-    if (
-      [
-        "jodi",
-        "full-sangam",
-        "last-digit",
-        "first-digit",
-      ].includes(this.gameType)
-    ) {
+    // Format number based on game type
+    if (["jodi", "full-sangam", "last-digit", "first-digit"].includes(this.gameType)) {
       str = str.padStart(2, "0");
-    }
-
-    if (this.gameType === "panna") {
+    } else if (this.gameType === "panna") {
+      str = str.padStart(3, "0");
+    } else if (this.gameType === "half-sangam" && str.length === 2) {
       str = str.padStart(3, "0");
     }
 
     this.winningNumber = str;
 
-    // ======================================================
-    // LAST DIGIT
-    // ======================================================
-
+    // Extract digits
     if (this.gameType === "last-digit") {
       this.winningLastDigit = str.slice(-1);
       this.winningFirstDigit = null;
-    }
-
-    // ======================================================
-    // FIRST DIGIT
-    // ======================================================
-
-    else if (this.gameType === "first-digit") {
+    } else if (this.gameType === "first-digit") {
       this.winningFirstDigit = str.charAt(0);
       this.winningLastDigit = null;
-    }
-
-    // ======================================================
-    // OTHER GAME TYPES
-    // ======================================================
-
-    else {
+    } else {
       this.winningFirstDigit = null;
       this.winningLastDigit = null;
     }
 
-    next();
+    return next();
   } catch (error) {
-    next(error);
+    console.error('Error in pre-save middleware:', error);
+    return next(error);
   }
 });
 
 // ==========================================================
 // INDEXES
 // ==========================================================
-
-// One result per market + date + game type
 
 resultSchema.index(
   {
@@ -342,13 +233,10 @@ resultSchema.index({
 });
 
 // ==========================================================
-// STATIC: GET LATEST RESULT
+// STATIC METHODS
 // ==========================================================
 
-resultSchema.statics.getLatestResult = async function (
-  marketId,
-  gameType = null
-) {
+resultSchema.statics.getLatestResult = async function (marketId, gameType = null) {
   const query = {
     marketId,
     status: "declared",
@@ -366,52 +254,38 @@ resultSchema.statics.getLatestResult = async function (
     .exec();
 };
 
-// ==========================================================
-// STATIC: GET RESULTS BY DATE RANGE
-// ==========================================================
-
-resultSchema.statics.getResultsByDateRange =
-  async function (
-    startDate,
-    endDate,
-    marketId = null,
-    gameType = null
-  ) {
-    const query = {
-      resultDate: {
-        $gte: startDate,
-        $lte: endDate,
-      },
-      status: "declared",
-    };
-
-    if (marketId) {
-      query.marketId = marketId;
-    }
-
-    if (gameType) {
-      query.gameType = gameType;
-    }
-
-    return this.find(query)
-      .sort({
-        resultDate: -1,
-      })
-      .exec();
-  };
-
-// ==========================================================
-// STATIC: GET STATS
-// ==========================================================
-
-resultSchema.statics.getStats = async function (
-  marketId,
+resultSchema.statics.getResultsByDateRange = async function (
+  startDate,
+  endDate,
+  marketId = null,
   gameType = null
 ) {
+  const query = {
+    resultDate: {
+      $gte: startDate,
+      $lte: endDate,
+    },
+    status: "declared",
+  };
+
+  if (marketId) {
+    query.marketId = marketId;
+  }
+
+  if (gameType) {
+    query.gameType = gameType;
+  }
+
+  return this.find(query)
+    .sort({
+      resultDate: -1,
+    })
+    .exec();
+};
+
+resultSchema.statics.getStats = async function (marketId, gameType = null) {
   const match = {
-    marketId: new mongoose.Types.ObjectId(
-      marketId
-    ),
+    marketId: new mongoose.Types.ObjectId(marketId),
     status: "declared",
   };
 
@@ -423,30 +297,14 @@ resultSchema.statics.getStats = async function (
     {
       $match: match,
     },
-
     {
       $group: {
         _id: null,
-
-        totalResults: {
-          $sum: 1,
-        },
-
-        totalPayout: {
-          $sum: "$totalPayout",
-        },
-
-        totalWinners: {
-          $sum: "$totalWinningBids",
-        },
-
-        totalBids: {
-          $sum: "$totalBids",
-        },
-
-        avgPayout: {
-          $avg: "$totalPayout",
-        },
+        totalResults: { $sum: 1 },
+        totalPayout: { $sum: "$totalPayout" },
+        totalWinners: { $sum: "$totalWinningBids" },
+        totalBids: { $sum: "$totalBids" },
+        avgPayout: { $avg: "$totalPayout" },
       },
     },
   ]);
@@ -463,7 +321,7 @@ resultSchema.statics.getStats = async function (
 };
 
 // ==========================================================
-// VIRTUAL: SUMMARY
+// VIRTUAL
 // ==========================================================
 
 resultSchema.virtual("summary").get(function () {
@@ -474,8 +332,7 @@ resultSchema.virtual("summary").get(function () {
     winningNumber: this.winningNumber,
     resultDate: this.resultDate,
     totalBids: this.totalBids,
-    totalWinningBids:
-      this.totalWinningBids,
+    totalWinningBids: this.totalWinningBids,
     totalPayout: this.totalPayout,
     status: this.status,
   };
@@ -485,89 +342,32 @@ resultSchema.virtual("summary").get(function () {
 // METHOD: CHECK BID WIN
 // ==========================================================
 
-resultSchema.methods.checkBidWin = function (
-  bidNumber,
-  bidGameType
-) {
-  const winningNumStr = String(
-    this.winningNumber
-  ).trim();
-
-  const bidNumStr = String(
-    bidNumber
-  ).trim();
-
-  // ======================================================
-  // GAME TYPE MUST MATCH
-  // ======================================================
+resultSchema.methods.checkBidWin = function (bidNumber, bidGameType) {
+  const winningNumStr = String(this.winningNumber).trim();
+  const bidNumStr = String(bidNumber).trim();
 
   if (bidGameType !== this.gameType) {
     return false;
   }
 
-  // ======================================================
-  // SINGLE
-  // ======================================================
-
   switch (this.gameType) {
     case "single":
       return winningNumStr === bidNumStr;
-
-    // ====================================================
-    // JODI
-    // ====================================================
-
     case "jodi":
       return winningNumStr === bidNumStr;
-
-    // ====================================================
-    // PANNA
-    // ====================================================
-
     case "panna":
       return winningNumStr === bidNumStr;
-
-    // ====================================================
-    // HALF SANGAM
-    // ====================================================
-
     case "half-sangam":
       return (
         winningNumStr === bidNumStr ||
-        winningNumStr.slice(-1) ===
-          bidNumStr.slice(-1)
+        winningNumStr.slice(-1) === bidNumStr.slice(-1)
       );
-
-    // ====================================================
-    // FULL SANGAM
-    // ====================================================
-
     case "full-sangam":
-      return (
-        winningNumStr.slice(-2) ===
-        bidNumStr.slice(-2)
-      );
-
-    // ====================================================
-    // LAST DIGIT
-    // ====================================================
-
+      return winningNumStr.slice(-2) === bidNumStr.slice(-2);
     case "last-digit":
-      return (
-        winningNumStr.slice(-1) ===
-        bidNumStr.slice(-1)
-      );
-
-    // ====================================================
-    // FIRST DIGIT
-    // ====================================================
-
+      return winningNumStr.slice(-1) === bidNumStr.slice(-1);
     case "first-digit":
-      return (
-        winningNumStr.charAt(0) ===
-        bidNumStr.charAt(0)
-      );
-
+      return winningNumStr.charAt(0) === bidNumStr.charAt(0);
     default:
       return false;
   }
@@ -587,13 +387,6 @@ resultSchema.set("toObject", {
 
 // ==========================================================
 // MODEL
-// IMPORTANT:
-// Prevent OverwriteModelError during nodemon/reloads
 // ==========================================================
 
-module.exports =
-  mongoose.models.results ||
-  mongoose.model(
-    "results",
-    resultSchema
-  );
+module.exports = mongoose.models.results || mongoose.model("results", resultSchema);
