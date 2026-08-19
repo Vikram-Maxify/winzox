@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { useEffect } from "react";
 import { FaBolt, FaCrown } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
+import { Link } from "react-router-dom";
 import {
   fetchPublicBidResults,
   selectPublicBidResults,
@@ -92,9 +93,12 @@ const LiveResults = () => {
                 </p>
               </div>
             </div>
-            <button className="text-[11px] font-semibold bg-amber-500 text-white px-3 py-1.5 rounded-lg shadow-sm shrink-0">
+            <Link
+              to={"/matka/bids-history"}
+              className="text-[11px] font-semibold bg-amber-500 text-white px-3 py-1.5 rounded-lg shadow-sm shrink-0"
+            >
               View All
-            </button>
+            </Link>
           </div>
 
           {/* Matka Cards (from publicBidSlice reducer) */}
@@ -162,9 +166,12 @@ const LiveResults = () => {
                 </p>
               </div>
             </div>
-            <button className="text-[11px] font-semibold bg-amber-500 text-white px-3 py-1.5 rounded-lg shadow-sm shrink-0">
+            <Link
+              to={"/powerball/result"}
+              className="text-[11px] font-semibold bg-amber-500 text-white px-3 py-1.5 rounded-lg shadow-sm shrink-0"
+            >
               View All
-            </button>
+            </Link>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-2 gap-2">

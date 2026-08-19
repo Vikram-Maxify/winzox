@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 const games = [
   {
@@ -98,12 +99,13 @@ export default function PopularGames() {
         </div>
 
         {/* Cards Grid - 4 columns on all devices */}
-        <div className="grid grid-cols-4 gap-2 md:gap-5">
-          {displayGames.map((game, index) => (
-            <a
+        <div className="grid grid-cols-4 gap-5 mr-3">
+          {displayGames.slice(0, 4).map((game, index) => (
+            <Link
               key={index}
-              href={getGameLink(game)}
-              className="group relative rounded-xl md:rounded-2xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 bg-white aspect-[3/5.5] md:aspect-[3/4.5]"
+              to={getGameLink(game)}
+              className="group relative rounded-xl overflow-hidden bg-white block"
+              style={{ height: "150px", width: "120%" }}
             >
               {/* Background Image */}
               <div
@@ -111,27 +113,23 @@ export default function PopularGames() {
                 style={{ backgroundImage: `url(${game.image})` }}
               />
 
-              {/* Bottom Section - Content */}
-              <div className="absolute bottom-0 left-0 right-0 z-10 p-2 md:p-5">
-                {/* Game Name */}
-                <div className="text-center text-white mb-1 md:mb-3">
-                  <p>
-                    <span className="text-white text-[9px] md:text-[10px] font-bold uppercase tracking-wider">
-                      {game.title.split(" ")[0]}
-                    </span>
+              {/* Bottom Content */}
+              <div className="absolute bottom-0 left-0 right-0 z-10 p-2.5">
+                <div className="text-center text-white mb-1">
+                  <p className="text-[8px] font-bold uppercase tracking-wider text-yellow-400/80">
+                    {game.title?.split(" ")[0] || "GAME"}
                   </p>
-                  <h3 className="font-extrabold text-[10px] md:text-xl lg:text-2xl leading-tight drop-shadow-lg">
+                  <h3 className="font-extrabold text-[11px] leading-tight drop-shadow-lg">
                     {game.name}
                   </h3>
                 </div>
 
-                {/* Play Button */}
-                <button className="w-full inline-flex items-center justify-center gap-1 md:gap-2 bg-transparent border-white text-white font-bold rounded-lg md:rounded-xl px-1.5 py-1 md:px-4 md:py-2.5 text-[10px] md:text-xs lg:text-sm transition-all duration-300 shadow-lg hover:shadow-xl border border-yellow-300/50 group-hover:scale-105">
+                <button className="w-full inline-flex items-center justify-center gap-1 bg-white/15 backdrop-blur-sm border border-white/30 text-white font-semibold rounded-lg px-2 py-1.5 text-[9px] transition-all duration-300 hover:bg-white/25 hover:border-white/50 group-hover:scale-105">
                   <span>PLAY</span>
-                  <ArrowRight className="w-2 h-2 md:w-4 md:h-4 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
-            </a>
+            </Link>
           ))}
         </div>
       </div>
