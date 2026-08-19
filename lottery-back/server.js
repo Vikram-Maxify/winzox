@@ -142,6 +142,8 @@ const userUaeGameCountRoute = require(
   "./routes/user/uae/gameCountRoutes"
 );
 
+const bettingBonusRoutes = require('./routes/bettingBonusRoutes');
+
 const app = express();
 
 // ============================================
@@ -249,6 +251,8 @@ app.use("/api/admin/nepal/powerball-results", nepalPowerballResultRoutes);
 app.use("/api/admin/uae/game-count", uaeGameCountRoutes);
 app.use("/api/admin/uae/game-entries", uaeGameEntryRoutes);
 app.use("/api/admin/uae/powerball-results", uaePowerballResultRoutes);
+app.use('/api/admin/referral-levels', require('./routes/referralLevelRoutes'))
+app.use("/api/betting-bonus", bettingBonusRoutes);
 
 // ============================================
 // STATIC FILES & FRONTEND ROUTES

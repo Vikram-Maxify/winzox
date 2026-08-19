@@ -35,6 +35,7 @@ import {
   Trophy,
   Flag,
   MapPin,
+  Network,
   Zap as ZapIcon2,  // For Powerhit icon
 } from "lucide-react";
 
@@ -60,6 +61,8 @@ const Sidebar = ({ isOpen, onClose }) => {
       "/admin/withdrawal-settings",
       "/admin/security-settings",
       "/admin/ticketsetiings",
+      "/admin/referral-levels",
+      "/admin/betting-bonus",
     ];
     if (settingsPaths.includes(location.pathname)) {
       setExpandedMenus(prev => ({ ...prev, settings: true }));
@@ -425,6 +428,16 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: "Ticket Settings",
           path: "/admin/ticketsetiings",
           icon: <Award size={16} />,
+        },
+        {
+          name: "Referral Levels",
+          path: "/admin/referral-levels",
+          icon: <Network size={16} />,
+        },
+        {
+          name: "Betting Bonus",
+          path: "/admin/betting-bonus",
+          icon: <Gift size={16} />,
         },
       ],
     },

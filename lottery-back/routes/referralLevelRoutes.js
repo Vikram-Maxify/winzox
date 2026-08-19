@@ -11,7 +11,6 @@ const {
 
 const {
     protect,
-    adminProtect,
 } = require("../middleware/authMiddleware.js");
 
 
@@ -22,7 +21,6 @@ const {
 router.get(
     "/",
     protect,
-    adminProtect,
     getReferralLevels
 );
 
@@ -34,7 +32,6 @@ router.get(
 router.put(
     "/:level",
     protect,
-    adminProtect,
     updateReferralLevel
 );
 
@@ -46,7 +43,6 @@ router.put(
 router.put(
     "/",
     protect,
-    adminProtect,
     updateAllReferralLevels
 );
 
@@ -58,7 +54,6 @@ router.put(
 router.post(
     "/reset",
     protect,
-    adminProtect,
     resetReferralLevels
 );
 

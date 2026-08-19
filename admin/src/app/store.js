@@ -55,6 +55,9 @@ import uaeGameCountReducer from "../admin/redux/uae/gameCountSlice";
 import uaeGameEntryReducer from "../admin/redux/uae/gameEntrySlice";
 import uaePowerballResultReducer from "../admin/redux/uae/powerballResultSlice";
 
+import referralLevelReducer from "../admin/redux/referralLevelSlice";
+import bettingBonusReducer from "../admin/redux/bettingBonusSlice";
+
 
 export const store = configureStore({
   reducer: {
@@ -69,6 +72,8 @@ export const store = configureStore({
     withdrawalSettings: withdrawalSettingsReducer,
     banner: bannerReducer,
     ticketType: ticketTypeReducer,
+    bettingBonus: bettingBonusReducer,
+
 
 
     // ========================================
@@ -126,5 +131,7 @@ export const store = configureStore({
     adminBid: adminBidReducer,
     adminResult: adminResultReducer,
     currencyRate: currencyRateReducer,
+    referralLevel: referralLevelReducer,
+
   },
 });

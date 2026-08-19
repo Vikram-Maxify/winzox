@@ -23,6 +23,9 @@ router.get("/admin/today", protect, adminProtect, bidController.adminGetTodayBid
 // Get bid by ID (Admin)
 router.get("/admin/:bidId", protect, adminProtect, bidController.adminGetBidById);
 
+router.get("/admin/lowest/:marketId", bidController.getLowestBidNumber);
+
+
 // Update bid status
 router.put("/admin/:bidId/status", protect, adminProtect, bidController.adminUpdateBidStatus);
 
