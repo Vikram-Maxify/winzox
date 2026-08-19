@@ -54,6 +54,8 @@ import AdminNepalPowerballResult from "./admin/pages/nepal/AdminNepalPowerballRe
 import AdminUAEGameCount from "./admin/pages/uae/AdminUAEGameCount";
 import AdminUAEGameEntries from "./admin/pages/uae/AdminUAEGameEntries";
 import AdminUAEPowerballResult from "./admin/pages/uae/AdminUAEPowerballResult";
+import ReferralLevels from "./admin/pages/ReferralLevels";
+import AdminBettingBonus from "./admin/pages/AdminBettingBonus";
 
 function App() {
   return (
@@ -168,6 +170,14 @@ function App() {
           {/* UAE */}
           <Route path="/admin/uae/gamecounts" element={<AdminUAEGameCount />} />
           <Route path="/admin/uae/gameEntries" element={<AdminUAEGameEntries />} />
+          <Route
+            path="/admin/referral-levels"
+            element={<ReferralLevels />}
+          />
+          <Route
+            path="/admin/betting-bonus"
+            element={<AdminBettingBonus />}
+          />
 
         </Route>
       </Route>

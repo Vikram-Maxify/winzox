@@ -1,6 +1,7 @@
 const Bid = require("../models/Bid");
 const Market = require("../models/Market");
 const User = require("../models/authmodel");
+const BettingBonus = require("../models/BettingBonus");
 const mongoose = require("mongoose");
 
 // ================= HELPER FUNCTIONS =================
@@ -1991,7 +1992,19 @@ exports.declareResult = async (req, res) => {
     let totalWon = 0;
     let totalLost = 0;
     let totalPayout = 0;
+    let totalBettingBonus = 0;
+    let totalBonusRecipients = 0;
     const winningBidsList = [];
+
+    // Load admin-configured betting bonus once for this result declaration.
+    const bonusConfig = await BettingBonus.findOne().session(session);
+    const bonusIsActive =
+      bonusConfig &&
+      bonusConfig.isActive === true &&
+      Number(bonusConfig.percentage) > 0;
+    const bonusPercentage = bonusIsActive
+      ? Number(bonusConfig.percentage)
+      : 0;
 
     for (const bid of pendingBids) {
       const isWin = checkBidWin(bid, formattedWinningNumber);
@@ -2003,13 +2016,50 @@ exports.declareResult = async (req, res) => {
         bid.wonAt = new Date();
         bid.resultNumber = formattedWinningNumber;
 
-        // Add winnings to user balance
+        // Add winnings to winner's balance
         const user = await User.findById(bid.userId).session(session);
+
         if (user) {
-          user.balance += bid.possibleWinAmount;
+          const winAmount = Number(bid.possibleWinAmount || 0);
+
+          user.balance += winAmount;
           await user.save({ session });
-          totalPayout += bid.possibleWinAmount;
+
+          totalPayout += winAmount;
+
+          // ======================================================
+          // ADMIN CONFIGURABLE BETTING / REFERRAL BONUS
+          // ======================================================
+          // Bonus = winning amount × admin-configured percentage.
+          // It is credited to the winner's referrer (referredBy).
+          if (user.referredBy && bonusIsActive && winAmount > 0) {
+            const bonusAmount = Number(
+              ((winAmount * bonusPercentage) / 100).toFixed(2)
+            );
+
+            if (bonusAmount > 0) {
+              const referrer = await User.findById(user.referredBy).session(
+                session
+              );
+
+              if (referrer) {
+                referrer.balance += bonusAmount;
+                await referrer.save({ session });
+
+                totalBettingBonus += bonusAmount;
+                totalBonusRecipients++;
+
+                // These values are available in the response.
+                // If not defined in Bid schema, Mongoose strict mode
+                // will simply not persist them.
+                bid.bettingBonusPercentage = bonusPercentage;
+                bid.bettingBonusAmount = bonusAmount;
+                bid.bettingBonusUserId = referrer._id;
+              }
+            }
+          }
         }
+
         totalWon++;
         winningBidsList.push(bid);
       } else {
@@ -2037,6 +2087,9 @@ exports.declareResult = async (req, res) => {
       totalBids: pendingBids.length,
       totalWinningBids: totalWon,
       totalPayout: totalPayout,
+      bettingBonusPercentage: bonusPercentage,
+      totalBettingBonus,
+      totalBonusRecipients,
       status: "declared",
     };
 
@@ -2069,19 +2122,24 @@ exports.declareResult = async (req, res) => {
           winningNumber: formattedWinningNumber,
           gameType,
         },
-        result: result[0],
-        summary: {
-          totalBidsProcessed: pendingBids.length,
-          totalWon,
-          totalLost,
-          totalPayout,
-        },
+        result: result[0],          summary: {
+            totalBidsProcessed: pendingBids.length,
+            totalWon,
+            totalLost,
+            totalPayout,
+            bettingBonusPercentage: bonusPercentage,
+            totalBettingBonus,
+            totalBonusRecipients,
+          },
         winningBids: winningBidsList.map((b) => ({
           id: b._id,
           userId: b.userId,
           number: b.number,
           bidAmount: b.bidAmount,
           winAmount: b.winAmount,
+          bettingBonusPercentage: b.bettingBonusPercentage || 0,
+          bettingBonusAmount: b.bettingBonusAmount || 0,
+          bettingBonusUserId: b.bettingBonusUserId || null,
         })),
       },
     });
@@ -2092,6 +2150,60 @@ exports.declareResult = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message || "Internal server error",
+    });
+  }
+};
+
+exports.getLowestBidNumber = async (req, res) => {
+  try {
+    const { marketId } = req.params;
+
+    if (!marketId) {
+      return res.status(400).json({
+        success: false,
+        message: "Market ID is required",
+      });
+    }
+
+    // Find all pending bids of this market
+    const bids = await Bid.find({
+      marketId: marketId,
+      status: "pending",
+    })
+      .select("number gameType bidAmount userId")
+      .lean();
+
+    if (!bids.length) {
+      return res.status(404).json({
+        success: false,
+        message: "No pending bids found for this market",
+        marketId,
+      });
+    }
+
+    // Convert number to numeric value and find lowest
+    const lowestBid = bids.reduce((lowest, current) => {
+      const lowestNumber = Number(lowest.number);
+      const currentNumber = Number(current.number);
+
+      return currentNumber < lowestNumber ? current : lowest;
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Lowest bid number fetched successfully",
+      marketId,
+      lowestNumber: lowestBid.number,
+      gameType: lowestBid.gameType,
+      bidAmount: lowestBid.bidAmount,
+    });
+  } catch (error) {
+    console.error("Get Lowest Bid Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
     });
   }
 };

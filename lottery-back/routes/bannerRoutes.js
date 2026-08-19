@@ -37,6 +37,9 @@ router.put(
   updateBanner
 );
 
+
+
+
 // Delete
 router.delete("/:id", protect, adminProtect, deleteBanner);
 
