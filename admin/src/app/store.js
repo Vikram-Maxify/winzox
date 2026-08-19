@@ -19,6 +19,7 @@ import currencyRateReducer from "../admin/redux/currencyRateSlice";
 import australiaGameCountReducer from "../admin/redux/australia/gameCountSlice";
 import australiaGameEntryReducer from "../admin/redux/australia/gameEntrySlice";
 import australiaPowerballResultReducer from "../admin/redux/australia/powerballResultSlice";
+import australiaPowerballDivisionReducer from "../admin/redux/australia/AustraliaPowerballDivisionSlice";
 
 // ========================================
 // PAKISTAN
@@ -26,6 +27,7 @@ import australiaPowerballResultReducer from "../admin/redux/australia/powerballR
 import pakistanGameCountReducer from "../admin/redux/pakistan/gameCountSlice";
 import pakistanGameEntryReducer from "../admin/redux/pakistan/gameEntrySlice";
 import pakistanPowerballResultReducer from "../admin/redux/pakistan/powerballResultSlice";
+import pakistanPowerballDivisionReducer from "../admin/redux/pakistan/PakistanPowerballDivisionSlice";
 
 // ========================================
 // CANADA
@@ -33,6 +35,7 @@ import pakistanPowerballResultReducer from "../admin/redux/pakistan/powerballRes
 import canadaGameCountReducer from "../admin/redux/canada/gameCountSlice";
 import canadaGameEntryReducer from "../admin/redux/canada/gameEntrySlice";
 import canadaPowerballResultReducer from "../admin/redux/canada/powerballResultSlice";
+import canadaPowerballDivisionReducer from "../admin/redux/canada/CanadaPowerballDivisionSlice";
 
 // ========================================
 // INDIA
@@ -40,6 +43,7 @@ import canadaPowerballResultReducer from "../admin/redux/canada/powerballResultS
 import indiaGameCountReducer from "../admin/redux/india/gameCountSlice";
 import indiaGameEntryReducer from "../admin/redux/india/gameEntrySlice";
 import indiaPowerballResultReducer from "../admin/redux/india/powerballResultSlice";
+import indiaPowerballDivisionReducer from "../admin/redux/india/IndiaPowerballDivisionSlice";
 
 // ========================================
 // NEPAL
@@ -47,6 +51,7 @@ import indiaPowerballResultReducer from "../admin/redux/india/powerballResultSli
 import nepalGameCountReducer from "../admin/redux/nepal/gameCountSlice";
 import nepalGameEntryReducer from "../admin/redux/nepal/gameEntrySlice";
 import nepalPowerballResultReducer from "../admin/redux/nepal/powerballResultSlice";
+import nepalPowerballDivisionReducer from "../admin/redux/nepal/NepalPowerballDivisionSlice";
 
 // ========================================
 // UAE
@@ -54,14 +59,13 @@ import nepalPowerballResultReducer from "../admin/redux/nepal/powerballResultSli
 import uaeGameCountReducer from "../admin/redux/uae/gameCountSlice";
 import uaeGameEntryReducer from "../admin/redux/uae/gameEntrySlice";
 import uaePowerballResultReducer from "../admin/redux/uae/powerballResultSlice";
+import uaePowerballDivisionReducer from "../admin/redux/uae/UaePowerballDivisionSlice";
 
 import referralLevelReducer from "../admin/redux/referralLevelSlice";
 import bettingBonusReducer from "../admin/redux/bettingBonusSlice";
 
-
 export const store = configureStore({
   reducer: {
-
     // ========================================
     // ADMIN
     // ========================================
@@ -74,15 +78,13 @@ export const store = configureStore({
     ticketType: ticketTypeReducer,
     bettingBonus: bettingBonusReducer,
 
-
-
     // ========================================
     // AUSTRALIA
     // ========================================
     australiaGameCount: australiaGameCountReducer,
     australiaGameEntries: australiaGameEntryReducer,
     australiaPowerballResult: australiaPowerballResultReducer,
-
+    australiaPowerballDivision: australiaPowerballDivisionReducer,
 
     // ========================================
     // PAKISTAN
@@ -90,7 +92,7 @@ export const store = configureStore({
     pakistanGameCount: pakistanGameCountReducer,
     pakistanGameEntries: pakistanGameEntryReducer,
     pakistanPowerballResult: pakistanPowerballResultReducer,
-
+    pakistanPowerballDivision: pakistanPowerballDivisionReducer,
 
     // ========================================
     // CANADA
@@ -98,7 +100,7 @@ export const store = configureStore({
     canadaGameCount: canadaGameCountReducer,
     canadaGameEntries: canadaGameEntryReducer,
     canadaPowerballResult: canadaPowerballResultReducer,
-
+    canadaPowerballDivision: canadaPowerballDivisionReducer,
 
     // ========================================
     // INDIA
@@ -106,7 +108,7 @@ export const store = configureStore({
     indiaGameCount: indiaGameCountReducer,
     indiaGameEntries: indiaGameEntryReducer,
     indiaPowerballResult: indiaPowerballResultReducer,
-
+    indiaPowerballDivision: indiaPowerballDivisionReducer,
 
     // ========================================
     // NEPAL
@@ -114,7 +116,7 @@ export const store = configureStore({
     nepalGameCount: nepalGameCountReducer,
     nepalGameEntries: nepalGameEntryReducer,
     nepalPowerballResult: nepalPowerballResultReducer,
-
+    nepalPowerballDivision: nepalPowerballDivisionReducer,
 
     // ========================================
     // UAE
@@ -122,7 +124,7 @@ export const store = configureStore({
     uaeGameCount: uaeGameCountReducer,
     uaeGameEntries: uaeGameEntryReducer,
     uaePowerballResult: uaePowerballResultReducer,
-
+    uaePowerballDivision: uaePowerballDivisionReducer,
 
     // ========================================
     // OTHER ADMIN
@@ -132,6 +134,5 @@ export const store = configureStore({
     adminResult: adminResultReducer,
     currencyRate: currencyRateReducer,
     referralLevel: referralLevelReducer,
-
   },
 });
