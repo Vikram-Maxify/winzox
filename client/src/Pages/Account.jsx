@@ -156,12 +156,32 @@ const Account = () => {
     <div className="min-h-screen bg-white pb-24">
       <div className="max-w-2xl mx-auto px-4 py-4">
         {/* Profile Card */}
+        {/* Profile Card */}
         <Link
           to="/profile"
           className="flex items-center gap-4 rounded-2xl bg-white border border-amber-200 p-4 mb-4"
         >
-          <div className="w-20 h-20 rounded-full border-2 border-amber-400 flex items-center justify-center flex-shrink-0">
-            <User size={38} className="text-amber-400" strokeWidth={1.5} />
+          {/* Profile Picture / Avatar */}
+          <div className="w-20 h-20 rounded-full border-2 border-amber-400 flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-100">
+            {user?.profilePic ? (
+              <img
+                src={user.profilePic}
+                alt={getUserDisplayName()}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  // Agar image load na ho toh default icon dikhao
+                  e.target.style.display = "none";
+                  e.target.parentElement.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-amber-400">
+              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          `;
+                }}
+              />
+            ) : (
+              <User size={38} className="text-amber-400" strokeWidth={1.5} />
+            )}
           </div>
 
           <div className="flex-1 min-w-0">
