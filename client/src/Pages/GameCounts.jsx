@@ -10,9 +10,6 @@ const countries = [
 
 // GameSelection.jsx - Amber/Orange/Yellow Theme with Multi-Country Support
 
-import React, { useEffect, useMemo, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   ArrowRight,
@@ -23,6 +20,7 @@ import {
   Crown,
   Diamond,
   Gift,
+  Globe,
   Grid3x3,
   Loader2,
   Play,
@@ -36,15 +34,17 @@ import {
   Users,
   X,
   Zap,
-  Globe,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useSearchParams } from "react-router-dom";
 
 // Import country-specific game count slices
-import { getGameCounts as getIndiaGameCounts } from "../redux/slices/india/gameCountSlice";
 import { getGameCounts as getAustraliaGameCounts } from "../redux/slices/australia/gameCountSlice";
-import { getGameCounts as getPakistanGameCounts } from "../redux/slices/pakistan/gameCountSlice";
 import { getGameCounts as getCanadaGameCounts } from "../redux/slices/canada/gameCountSlice";
+import { getGameCounts as getIndiaGameCounts } from "../redux/slices/india/gameCountSlice";
 import { getGameCounts as getNepalGameCounts } from "../redux/slices/nepal/gameCountSlice";
+import { getGameCounts as getPakistanGameCounts } from "../redux/slices/pakistan/gameCountSlice";
 import { getGameCounts as getUaeGameCounts } from "../redux/slices/uae/gameCountSlice";
 
 import {
@@ -57,34 +57,47 @@ import { getUserTicketTypes } from "../redux/slices/ticketTypeSlice";
 const CustomModal = ({ isOpen, onClose, type, title, message, details }) => {
   if (!isOpen) return null;
 
-  const isSuccess = type === 'success';
-  const icon = isSuccess ? '✅' : '❌';
-  const bgGradient = isSuccess 
-    ? 'from-green-500 to-emerald-500' 
-    : 'from-red-500 to-rose-500';
-  const borderColor = isSuccess ? 'border-green-400' : 'border-red-400';
-  const iconBg = isSuccess ? 'bg-green-100' : 'bg-red-100';
+  const isSuccess = type === "success";
+  const icon = isSuccess ? "✅" : "❌";
+  const bgGradient = isSuccess
+    ? "from-green-500 to-emerald-500"
+    : "from-red-500 to-rose-500";
+  const borderColor = isSuccess ? "border-green-400" : "border-red-400";
+  const iconBg = isSuccess ? "bg-green-100" : "bg-red-100";
 
   return (
     <>
       {/* Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center animate-fadeIn"
         onClick={onClose}
       >
         {/* Modal */}
-        <div 
+        <div
           className="relative w-full max-w-md mx-4 transform-gpu animate-scaleIn"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className={`bg-white rounded-3xl shadow-2xl overflow-hidden border-2 ${borderColor}`}>
+          <div
+            className={`bg-white rounded-3xl shadow-2xl overflow-hidden border-2 ${borderColor}`}
+          >
             {/* Gradient Header */}
-            <div className={`bg-gradient-to-r ${bgGradient} p-6 text-center relative`}>
+            <div
+              className={`bg-gradient-to-r ${bgGradient} p-6 text-center relative`}
+            >
               <div className="absolute inset-0 opacity-10">
-                <div className="w-full h-full" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
+                <div
+                  className="w-full h-full"
+                  style={{
+                    backgroundImage:
+                      "radial-gradient(circle at 2px 2px, white 1px, transparent 0)",
+                    backgroundSize: "40px 40px",
+                  }}
+                ></div>
               </div>
               <div className="relative z-10">
-                <div className={`w-20 h-20 rounded-full ${iconBg} flex items-center justify-center mx-auto mb-3 shadow-xl transform-gpu animate-bounce-slow`}>
+                <div
+                  className={`w-20 h-20 rounded-full ${iconBg} flex items-center justify-center mx-auto mb-3 shadow-xl transform-gpu animate-bounce-slow`}
+                >
                   <span className="text-4xl">{icon}</span>
                 </div>
                 <h3 className="text-2xl font-bold text-white drop-shadow-lg">
@@ -98,7 +111,7 @@ const CustomModal = ({ isOpen, onClose, type, title, message, details }) => {
               <p className="text-gray-700 text-center text-lg font-medium">
                 {message}
               </p>
-              
+
               {details && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
                   <p className="text-sm text-gray-600 font-mono break-all">
@@ -110,9 +123,9 @@ const CustomModal = ({ isOpen, onClose, type, title, message, details }) => {
               {/* Close Button */}
               <button
                 onClick={onClose}
-                className={`mt-6 w-full py-3.5 rounded-xl font-bold text-white transition-all duration-300 transform-gpu hover:scale-105 hover:shadow-xl ${isSuccess ? 'bg-gradient-to-r from-green-500 to-emerald-500' : 'bg-gradient-to-r from-red-500 to-rose-500'}`}
+                className={`mt-6 w-full py-3.5 rounded-xl font-bold text-white transition-all duration-300 transform-gpu hover:scale-105 hover:shadow-xl ${isSuccess ? "bg-gradient-to-r from-green-500 to-emerald-500" : "bg-gradient-to-r from-red-500 to-rose-500"}`}
               >
-                {isSuccess ? '🎉 Great!' : 'Got it'}
+                {isSuccess ? "🎉 Great!" : "Got it"}
               </button>
             </div>
 
@@ -129,22 +142,31 @@ const CustomModal = ({ isOpen, onClose, type, title, message, details }) => {
 
       <style jsx>{`
         @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
         }
         @keyframes scaleIn {
-          from { 
+          from {
             opacity: 0;
             transform: scale(0.8) translateY(20px) rotateX(10deg);
           }
-          to { 
+          to {
             opacity: 1;
             transform: scale(1) translateY(0) rotateX(0);
           }
         }
         @keyframes bounce-slow {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
+          0%,
+          100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
         }
         .animate-fadeIn {
           animation: fadeIn 0.3s ease-out;
@@ -163,21 +185,21 @@ const CustomModal = ({ isOpen, onClose, type, title, message, details }) => {
 const GameSelection = () => {
   const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
-  
+
   // Get country from URL: /powerhit?country=India
-  const urlCountry = searchParams.get('country');
+  const urlCountry = searchParams.get("country");
 
   // Get user data from auth slice
-  const { user } = useSelector((state) => state.auth || {});
+  const { user } = useSelector((state) => state.auth || { user: null });
   const userCountry = user?.country || null;
-  
+
   // URL country takes priority over user's country
   const activeCountryName = urlCountry || userCountry;
 
   // ==========================================
   // COUNTRY CONFIGURATION
   // ==========================================
-  
+
   const countryConfig = {
     india: {
       stateKey: "indiaGameCount",
@@ -232,7 +254,13 @@ const GameSelection = () => {
     if (!activeCountryConfig) {
       return { gameCounts: [], loading: false, error: null };
     }
-    return state[activeCountryConfig.stateKey] || { gameCounts: [], loading: false, error: null };
+    return (
+      state[activeCountryConfig.stateKey] || {
+        gameCounts: [],
+        loading: false,
+        error: null,
+      }
+    );
   });
 
   const {
@@ -256,7 +284,7 @@ const GameSelection = () => {
   const getCountryCodeFromName = (countryName) => {
     if (!countryName) return null;
     const country = countries.find(
-      (c) => c.name.toLowerCase() === countryName.toLowerCase()
+      (c) => c.name.toLowerCase() === countryName.toLowerCase(),
     );
     return country?.code || null;
   };
@@ -264,7 +292,7 @@ const GameSelection = () => {
   const getCountryObject = (countryName) => {
     if (!countryName) return null;
     return countries.find(
-      (c) => c.name.toLowerCase() === countryName.toLowerCase()
+      (c) => c.name.toLowerCase() === countryName.toLowerCase(),
     );
   };
 
@@ -293,14 +321,14 @@ const GameSelection = () => {
   const [hoveredTicket, setHoveredTicket] = useState(null);
   const [allGamesExpanded, setAllGamesExpanded] = useState(false);
   const [countryError, setCountryError] = useState(null);
-  
+
   // ===== MODAL STATE =====
   const [modal, setModal] = useState({
     isOpen: false,
-    type: 'success',
-    title: '',
-    message: '',
-    details: null
+    type: "success",
+    title: "",
+    message: "",
+    details: null,
   });
 
   // ==========================================
@@ -392,7 +420,9 @@ const GameSelection = () => {
     }
     const countryObj = getCountryObject(activeCountryName);
     if (!countryObj) {
-      setCountryError(`Country "${activeCountryName}" not found in our supported countries.`);
+      setCountryError(
+        `Country "${activeCountryName}" not found in our supported countries.`,
+      );
       return false;
     }
     setCountryError(null);
@@ -420,8 +450,8 @@ const GameSelection = () => {
     if (ticketTypes.length > 0 && !activeTicket) {
       // If URL has country, try to auto-select matching ticket
       if (urlCountry) {
-        const matchingTicket = ticketTypes.find(ticket => 
-          ticket.title?.toLowerCase().includes(urlCountry.toLowerCase())
+        const matchingTicket = ticketTypes.find((ticket) =>
+          ticket.title?.toLowerCase().includes(urlCountry.toLowerCase()),
         );
         if (matchingTicket) {
           setActiveTicket(matchingTicket._id);
@@ -451,17 +481,19 @@ const GameSelection = () => {
       setShowSuccess(true);
       setModal({
         isOpen: true,
-        type: 'success',
-        title: '🎉 Entry Created Successfully!',
-        message: entryMessage || 'Your game entry has been added to cart successfully.',
-        details: `Ticket: ${activeTicketTitle} | ${selectedCount?.totalGames || 0} Games | ${selectionMode === 'quickpick' ? 'QuickPick' : 'Pick Your Numbers'} | Country: ${activeCountryName} (${activeCountryCode || 'N/A'})`
+        type: "success",
+        title: "🎉 Entry Created Successfully!",
+        message:
+          entryMessage ||
+          "Your game entry has been added to cart successfully.",
+        details: `Ticket: ${activeTicketTitle} | ${selectedCount?.totalGames || 0} Games | ${selectionMode === "quickpick" ? "QuickPick" : "Pick Your Numbers"} | Country: ${activeCountryName} (${activeCountryCode || "N/A"})`,
       });
-      
+
       const timer = setTimeout(() => {
         closeModal();
         dispatch(resetGameEntryState());
       }, 5000);
-      
+
       return () => clearTimeout(timer);
     }
   }, [entrySuccess, dispatch]);
@@ -469,18 +501,21 @@ const GameSelection = () => {
   // Show error modal
   useEffect(() => {
     if (entryError) {
-      const errorMessage = typeof entryError === 'string' 
-        ? entryError 
-        : entryError?.message || 'Something went wrong. Please try again.';
-      
-      const isCountryError = errorMessage.toLowerCase().includes('country');
-      
+      const errorMessage =
+        typeof entryError === "string"
+          ? entryError
+          : entryError?.message || "Something went wrong. Please try again.";
+
+      const isCountryError = errorMessage.toLowerCase().includes("country");
+
       setModal({
         isOpen: true,
-        type: 'error',
-        title: isCountryError ? '🌍 Country Error' : '❌ Error Occurred',
+        type: "error",
+        title: isCountryError ? "🌍 Country Error" : "❌ Error Occurred",
         message: errorMessage,
-        details: isCountryError ? `Active Country: ${activeCountryName || 'Not Set'} (${activeCountryCode || 'N/A'})` : null
+        details: isCountryError
+          ? `Active Country: ${activeCountryName || "Not Set"} (${activeCountryCode || "N/A"})`
+          : null,
       });
     }
   }, [entryError, activeCountryName, activeCountryCode]);
@@ -493,7 +528,11 @@ const GameSelection = () => {
   }, [activeTicket, availableGameTypes, selectedGameType]);
 
   useEffect(() => {
-    if (selectedGameType && filteredGameCounts.length > 0 && !selectedGameCount) {
+    if (
+      selectedGameType &&
+      filteredGameCounts.length > 0 &&
+      !selectedGameCount
+    ) {
       setSelectedGameCount(filteredGameCounts[0]._id);
     }
   }, [selectedGameType, filteredGameCounts, selectedGameCount]);
@@ -503,7 +542,7 @@ const GameSelection = () => {
   // ==========================================
 
   const closeModal = () => {
-    setModal(prev => ({ ...prev, isOpen: false }));
+    setModal((prev) => ({ ...prev, isOpen: false }));
     setShowSuccess(false);
     dispatch(resetGameEntryState());
   };
@@ -579,10 +618,10 @@ const GameSelection = () => {
         if (currentNumbers.length >= 7) {
           setModal({
             isOpen: true,
-            type: 'error',
-            title: '⚠️ Maximum Numbers Reached',
-            message: 'You can select maximum 7 numbers per game.',
-            details: null
+            type: "error",
+            title: "⚠️ Maximum Numbers Reached",
+            message: "You can select maximum 7 numbers per game.",
+            details: null,
           });
           return prev;
         }
@@ -701,10 +740,11 @@ const GameSelection = () => {
     if (!activeCountryName) {
       setModal({
         isOpen: true,
-        type: 'error',
-        title: '🌍 Country Not Set',
-        message: 'Please set your country before playing. Update your profile to continue.',
-        details: 'Go to Profile → Edit Profile → Select Country'
+        type: "error",
+        title: "🌍 Country Not Set",
+        message:
+          "Please set your country before playing. Update your profile to continue.",
+        details: "Go to Profile → Edit Profile → Select Country",
       });
       return;
     }
@@ -713,10 +753,10 @@ const GameSelection = () => {
     if (!countryObj) {
       setModal({
         isOpen: true,
-        type: 'error',
-        title: '🌍 Unsupported Country',
+        type: "error",
+        title: "🌍 Unsupported Country",
         message: `"${activeCountryName}" is not a supported country. Please select a valid country.`,
-        details: `Supported countries: ${countries.map(c => c.name).join(', ')}`
+        details: `Supported countries: ${countries.map((c) => c.name).join(", ")}`,
       });
       return;
     }
@@ -727,10 +767,11 @@ const GameSelection = () => {
     if (!selectionMode) {
       setModal({
         isOpen: true,
-        type: 'error',
-        title: '⚠️ Selection Mode Required',
-        message: 'Please select either "Pick Your Numbers" or "QuickPick" mode.',
-        details: null
+        type: "error",
+        title: "⚠️ Selection Mode Required",
+        message:
+          'Please select either "Pick Your Numbers" or "QuickPick" mode.',
+        details: null,
       });
       return;
     }
@@ -738,28 +779,28 @@ const GameSelection = () => {
     if (games.length === 0) {
       setModal({
         isOpen: true,
-        type: 'error',
-        title: '⚠️ No Games',
-        message: 'No games to add. Please select a game mode first.',
-        details: null
+        type: "error",
+        title: "⚠️ No Games",
+        message: "No games to add. Please select a game mode first.",
+        details: null,
       });
       return;
     }
 
     if (!allGamesFilled) {
-      const incompleteGames = games.filter(g => {
+      const incompleteGames = games.filter((g) => {
         if (selectionMode === "quickpick") {
           return !(g.numbers?.length === 7 && g.powerball);
         }
         return !(g.selectedNumbers?.length === 7 && g.selectedPowerball);
       });
-      
+
       setModal({
         isOpen: true,
-        type: 'error',
-        title: '⚠️ Incomplete Games',
+        type: "error",
+        title: "⚠️ Incomplete Games",
         message: `Please fill all ${games.length} games with 7 numbers and a Powerball before adding to cart. ${incompleteGames.length} game(s) incomplete.`,
-        details: null
+        details: null,
       });
       return;
     }
@@ -767,10 +808,10 @@ const GameSelection = () => {
     if (!selectedCount || !selectedCount._id) {
       setModal({
         isOpen: true,
-        type: 'error',
-        title: '⚠️ No Package Selected',
-        message: 'Please select a game package.',
-        details: null
+        type: "error",
+        title: "⚠️ No Package Selected",
+        message: "Please select a game package.",
+        details: null,
       });
       return;
     }
@@ -778,10 +819,10 @@ const GameSelection = () => {
     if (!activeTicket) {
       setModal({
         isOpen: true,
-        type: 'error',
-        title: '⚠️ No Ticket Selected',
-        message: 'Please select a ticket type.',
-        details: null
+        type: "error",
+        title: "⚠️ No Ticket Selected",
+        message: "Please select a ticket type.",
+        details: null,
       });
       return;
     }
@@ -804,10 +845,10 @@ const GameSelection = () => {
     if (!isValid) {
       setModal({
         isOpen: true,
-        type: 'error',
-        title: '⚠️ Invalid Game Data',
-        message: 'All games must have 7 numbers and a Powerball.',
-        details: null
+        type: "error",
+        title: "⚠️ Invalid Game Data",
+        message: "All games must have 7 numbers and a Powerball.",
+        details: null,
       });
       return;
     }
@@ -822,7 +863,7 @@ const GameSelection = () => {
       totalPrice: totalPrice,
       country: countryCode,
       countryName: activeCountryName,
-      countryFlag: countryObj.flag
+      countryFlag: countryObj.flag,
     };
 
     try {
@@ -833,16 +874,17 @@ const GameSelection = () => {
       setAllGamesExpanded(false);
     } catch (error) {
       console.error("Failed to create entry:", error);
-      const errorMessage = typeof error === 'string' 
-        ? error 
-        : error?.message || 'Failed to create game entry. Please try again.';
-      
+      const errorMessage =
+        typeof error === "string"
+          ? error
+          : error?.message || "Failed to create game entry. Please try again.";
+
       setModal({
         isOpen: true,
-        type: 'error',
-        title: '❌ Submission Failed',
+        type: "error",
+        title: "❌ Submission Failed",
         message: errorMessage,
-        details: null
+        details: null,
       });
     }
   };
@@ -886,7 +928,7 @@ const GameSelection = () => {
             </div>
           </div>
           <p className="text-gray-600 font-medium">
-            Loading your tickets for {activeCountryName || '...'}...
+            Loading your tickets for {activeCountryName || "..."}...
           </p>
         </div>
       </div>
@@ -932,10 +974,11 @@ const GameSelection = () => {
               </p>
               {urlCountry && (
                 <p className="text-white/80 text-sm mt-2 flex items-center gap-2">
-                  <Globe size={16} /> Playing: <span className="font-bold uppercase">{urlCountry}</span>
+                  <Globe size={16} /> Playing:{" "}
+                  <span className="font-bold uppercase">{urlCountry}</span>
                   {activeCountryObject && (
-                    <img 
-                      src={activeCountryObject.flag} 
+                    <img
+                      src={activeCountryObject.flag}
                       alt={activeCountryObject.name}
                       className="w-6 h-4 rounded-sm shadow-lg ml-1"
                     />
@@ -954,8 +997,8 @@ const GameSelection = () => {
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-white/30 flex items-center justify-center shadow-inner">
                   {activeCountryObject ? (
-                    <img 
-                      src={activeCountryObject.flag} 
+                    <img
+                      src={activeCountryObject.flag}
                       alt={activeCountryObject.name}
                       className="w-8 h-6 rounded-sm shadow-lg"
                     />
@@ -965,11 +1008,13 @@ const GameSelection = () => {
                 </div>
                 <div>
                   <p className="text-white/80 text-xs font-medium">
-                    {urlCountry ? 'Selected Country' : 'Playing from'}
+                    {urlCountry ? "Selected Country" : "Playing from"}
                   </p>
                   <div className="flex items-center gap-2">
                     <span className="text-white font-bold text-lg">
-                      {activeCountryObject?.name || activeCountryName || "Not Set"}
+                      {activeCountryObject?.name ||
+                        activeCountryName ||
+                        "Not Set"}
                     </span>
                     {activeCountryCode && (
                       <span className="text-white/90 text-xs font-mono bg-white/30 px-2 py-0.5 rounded-full">
@@ -1018,13 +1063,15 @@ const GameSelection = () => {
               <AlertCircle size={24} className="text-red-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <h4 className="font-bold text-red-700 text-lg">Country Not Set!</h4>
+              <h4 className="font-bold text-red-700 text-lg">
+                Country Not Set!
+              </h4>
               <p className="text-red-600 text-sm mt-1">
-                Please update your profile with your country to play games. 
-                This is required for currency conversion and game eligibility.
+                Please update your profile with your country to play games. This
+                is required for currency conversion and game eligibility.
               </p>
-              <button 
-                onClick={() => window.location.href = '/profile'}
+              <button
+                onClick={() => (window.location.href = "/profile")}
                 className="mt-3 bg-red-500 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-red-600 transition-all duration-300 shadow-lg shadow-red-200 hover:scale-105 flex items-center gap-2"
               >
                 Update Profile <ArrowRight size={18} />
@@ -1056,11 +1103,15 @@ const GameSelection = () => {
               No ticket types available
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+            <div className="grid grid-cols-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
               {ticketTypes.map((ticket) => {
                 const isActive = activeTicket === ticket._id;
                 const TicketIcon = getTicketIcon(ticket.title || ticket.name);
-                const isMatchingCountry = urlCountry && ticket.title?.toLowerCase().includes(urlCountry.toLowerCase());
+                const isMatchingCountry =
+                  urlCountry &&
+                  ticket.title
+                    ?.toLowerCase()
+                    .includes(urlCountry.toLowerCase());
 
                 return (
                   <button
@@ -1085,11 +1136,20 @@ const GameSelection = () => {
                       </div>
                     )}
                     <div className="flex flex-col items-center text-center gap-2 relative z-10">
-                      <div className={`p-3 rounded-xl ${isActive ? 'bg-amber-100 shadow-lg shadow-amber-200' : 'bg-gray-100 group-hover:bg-amber-50'} transition-all duration-300`}>
-                        <TicketIcon size={22} className={isActive ? "text-amber-600" : "text-gray-500"} />
+                      <div
+                        className={`p-3 rounded-xl ${isActive ? "bg-amber-100 shadow-lg shadow-amber-200" : "bg-gray-100 group-hover:bg-amber-50"} transition-all duration-300`}
+                      >
+                        <TicketIcon
+                          size={22}
+                          className={
+                            isActive ? "text-amber-600" : "text-gray-500"
+                          }
+                        />
                       </div>
                       <div className="flex-1">
-                        <h4 className={`font-bold text-sm capitalize transition-colors ${isActive ? 'text-amber-700' : 'text-gray-800 group-hover:text-amber-600'}`}>
+                        <h4
+                          className={`font-bold text-sm capitalize transition-colors ${isActive ? "text-amber-700" : "text-gray-800 group-hover:text-amber-600"}`}
+                        >
                           {ticket.title || ticket.name}
                         </h4>
                         {ticket.subTitle && (
@@ -1139,10 +1199,10 @@ const GameSelection = () => {
               className="w-full bg-white border-2 border-gray-200 rounded-xl h-12 px-4 pr-12 appearance-none focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed text-gray-700 font-medium transition-all duration-300 shadow-sm hover:shadow-md"
             >
               <option value="">
-                {!activeCountryName 
-                  ? "⚠️ Please set your country first" 
-                  : availableGameTypes.length === 0 
-                    ? "No game types available for this ticket" 
+                {!activeCountryName
+                  ? "⚠️ Please set your country first"
+                  : availableGameTypes.length === 0
+                    ? "No game types available for this ticket"
                     : "Select Game Type"}
               </option>
               {availableGameTypes.map((gameType) => (
@@ -1158,7 +1218,8 @@ const GameSelection = () => {
           </div>
           {!activeCountryName && (
             <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
-              <AlertCircle size={14} /> Please update your profile with your country to select game types
+              <AlertCircle size={14} /> Please update your profile with your
+              country to select game types
             </p>
           )}
         </div>
@@ -1192,10 +1253,10 @@ const GameSelection = () => {
               className="w-full bg-white border-2 border-gray-200 rounded-xl h-12 px-4 pr-12 appearance-none focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed text-gray-700 font-medium transition-all duration-300 shadow-sm hover:shadow-md"
             >
               <option value="">
-                {!activeCountryName 
-                  ? "⚠️ Please set your country first" 
-                  : filteredGameCounts.length === 0 
-                    ? "No game packages available" 
+                {!activeCountryName
+                  ? "⚠️ Please set your country first"
+                  : filteredGameCounts.length === 0
+                    ? "No game packages available"
                     : "Select Game Package"}
               </option>
               {filteredGameCounts.map((item) => (
@@ -1228,16 +1289,19 @@ const GameSelection = () => {
                 </p>
                 {activeCountryName && activeCountryObject && (
                   <p className="text-xs text-green-600 mt-1 flex items-center gap-2">
-                    <img 
-                      src={activeCountryObject.flag} 
+                    <img
+                      src={activeCountryObject.flag}
                       alt={activeCountryObject.name}
                       className="w-5 h-3 rounded-sm shadow-md"
                     />
-                    <CheckCircle size={14} /> Playing from: {activeCountryObject.name}
+                    <CheckCircle size={14} /> Playing from:{" "}
+                    {activeCountryObject.name}
                     <span className="text-amber-600 font-mono bg-amber-50 px-2 py-0.5 rounded-full text-[10px]">
                       {activeCountryCode}
                     </span>
-                    {urlCountry && <span className="text-amber-600"> (via URL)</span>}
+                    {urlCountry && (
+                      <span className="text-amber-600"> (via URL)</span>
+                    )}
                   </p>
                 )}
               </div>
@@ -1253,10 +1317,11 @@ const GameSelection = () => {
                 }}
                 disabled={!selectedCount}
                 className={`group p-5 rounded-xl border-2 transition-all duration-300 text-left ${
-                  !selectedCount ? 'opacity-50 cursor-not-allowed' :
-                  selectionMode === "pick"
-                    ? "border-amber-400 bg-gradient-to-br from-amber-50 to-white shadow-lg shadow-amber-100"
-                    : "border-gray-200 bg-white hover:border-amber-300 hover:shadow-lg hover:-translate-y-1"
+                  !selectedCount
+                    ? "opacity-50 cursor-not-allowed"
+                    : selectionMode === "pick"
+                      ? "border-amber-400 bg-gradient-to-br from-amber-50 to-white shadow-lg shadow-amber-100"
+                      : "border-gray-200 bg-white hover:border-amber-300 hover:shadow-lg hover:-translate-y-1"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1295,7 +1360,9 @@ const GameSelection = () => {
                   <div className="mt-2 h-0.5 w-full bg-gradient-to-r from-amber-400 to-yellow-400 rounded-full"></div>
                 )}
                 {!selectedCount && (
-                  <p className="text-xs text-red-500 mt-2">Select a game package first</p>
+                  <p className="text-xs text-red-500 mt-2">
+                    Select a game package first
+                  </p>
                 )}
               </button>
 
@@ -1307,10 +1374,11 @@ const GameSelection = () => {
                 }}
                 disabled={!selectedCount}
                 className={`group p-5 rounded-xl border-2 transition-all duration-300 text-left ${
-                  !selectedCount ? 'opacity-50 cursor-not-allowed' :
-                  selectionMode === "quickpick"
-                    ? "border-amber-400 bg-gradient-to-br from-amber-50 to-white shadow-lg shadow-amber-100"
-                    : "border-gray-200 bg-white hover:border-amber-300 hover:shadow-lg hover:-translate-y-1"
+                  !selectedCount
+                    ? "opacity-50 cursor-not-allowed"
+                    : selectionMode === "quickpick"
+                      ? "border-amber-400 bg-gradient-to-br from-amber-50 to-white shadow-lg shadow-amber-100"
+                      : "border-gray-200 bg-white hover:border-amber-300 hover:shadow-lg hover:-translate-y-1"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1349,7 +1417,9 @@ const GameSelection = () => {
                   <div className="mt-2 h-0.5 w-full bg-gradient-to-r from-amber-400 to-yellow-400 rounded-full"></div>
                 )}
                 {!selectedCount && (
-                  <p className="text-xs text-red-500 mt-2">Select a game package first</p>
+                  <p className="text-xs text-red-500 mt-2">
+                    Select a game package first
+                  </p>
                 )}
               </button>
             </div>
@@ -1659,171 +1729,201 @@ const GameSelection = () => {
         )}
 
         {/* STEP 5: AUTOPLAY */}
-        {selectedCount && allGamesFilled && selectionMode !== null && games.length > 0 && activeCountryName && (
-          <div className="mt-10">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-r from-amber-400 to-yellow-400 text-white flex items-center justify-center font-bold text-xl shadow-2xl shadow-amber-200">
-                5
-              </div>
-              <div>
-                <h3 className="font-bold text-2xl text-gray-800">
-                  Play more than once?
-                </h3>
-                <p className="text-gray-500">
-                  Optional. Play for multiple draws
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl p-5 shadow-lg border-2 border-gray-100 hover:border-amber-200 transition-all duration-300">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1">
-                  <button
-                    onClick={() => setAutoPlay(!autoPlay)}
-                    className={`w-full p-4 rounded-xl border-2 transition-all duration-300 flex items-center justify-center gap-3 ${
-                      autoPlay
-                        ? "border-amber-400 bg-amber-50 shadow-md"
-                        : "border-gray-200 hover:border-amber-300 hover:bg-gray-50 bg-white"
-                    }`}
-                  >
-                    <Play
-                      size={20}
-                      className={
-                        autoPlay ? "text-amber-600" : "text-gray-500"
-                      }
-                    />
-                    <span
-                      className={`font-semibold ${autoPlay ? "text-amber-700" : "text-gray-700"}`}
-                    >
-                      AutoPlay
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      Cancel anytime
-                    </span>
-                  </button>
+        {selectedCount &&
+          allGamesFilled &&
+          selectionMode !== null &&
+          games.length > 0 &&
+          activeCountryName && (
+            <div className="mt-10">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-r from-amber-400 to-yellow-400 text-white flex items-center justify-center font-bold text-xl shadow-2xl shadow-amber-200">
+                  5
                 </div>
+                <div>
+                  <h3 className="font-bold text-2xl text-gray-800">
+                    Play more than once?
+                  </h3>
+                  <p className="text-gray-500">
+                    Optional. Play for multiple draws
+                  </p>
+                </div>
+              </div>
 
-                {autoPlay && (
-                  <div className="flex-1 flex flex-col gap-2">
-                    <label className="text-xs font-medium text-gray-700">
-                      Play for multiple draws
-                    </label>
-                    <div className="flex gap-2">
-                      {[2, 5, 10].map((num) => (
-                        <button
-                          key={num}
-                          onClick={() => setDrawCount(num)}
-                          className={`flex-1 p-3 rounded-xl border-2 transition-all duration-300 text-center ${
-                            drawCount === num
-                              ? "border-amber-400 bg-amber-50 shadow-md"
-                              : "border-gray-200 hover:border-amber-300 bg-white hover:shadow-md"
-                          }`}
-                        >
-                          <Calendar
-                            size={16}
-                            className={`mx-auto mb-1 ${drawCount === num ? "text-amber-600" : "text-gray-500"}`}
-                          />
-                          <span
-                            className={`text-xs font-medium block ${drawCount === num ? "text-amber-700" : "text-gray-700"}`}
-                          >
-                            {num} draws
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+              <div className="bg-white rounded-xl p-5 shadow-lg border-2 border-gray-100 hover:border-amber-200 transition-all duration-300">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <button
+                      onClick={() => setAutoPlay(!autoPlay)}
+                      className={`w-full p-4 rounded-xl border-2 transition-all duration-300 flex items-center justify-center gap-3 ${
+                        autoPlay
+                          ? "border-amber-400 bg-amber-50 shadow-md"
+                          : "border-gray-200 hover:border-amber-300 hover:bg-gray-50 bg-white"
+                      }`}
+                    >
+                      <Play
+                        size={20}
+                        className={
+                          autoPlay ? "text-amber-600" : "text-gray-500"
+                        }
+                      />
+                      <span
+                        className={`font-semibold ${autoPlay ? "text-amber-700" : "text-gray-700"}`}
+                      >
+                        AutoPlay
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        Cancel anytime
+                      </span>
+                    </button>
                   </div>
-                )}
+
+                  {autoPlay && (
+                    <div className="flex-1 flex flex-col gap-2">
+                      <label className="text-xs font-medium text-gray-700">
+                        Play for multiple draws
+                      </label>
+                      <div className="flex gap-2">
+                        {[2, 5, 10].map((num) => (
+                          <button
+                            key={num}
+                            onClick={() => setDrawCount(num)}
+                            className={`flex-1 p-3 rounded-xl border-2 transition-all duration-300 text-center ${
+                              drawCount === num
+                                ? "border-amber-400 bg-amber-50 shadow-md"
+                                : "border-gray-200 hover:border-amber-300 bg-white hover:shadow-md"
+                            }`}
+                          >
+                            <Calendar
+                              size={16}
+                              className={`mx-auto mb-1 ${drawCount === num ? "text-amber-600" : "text-gray-500"}`}
+                            />
+                            <span
+                              className={`text-xs font-medium block ${drawCount === num ? "text-amber-700" : "text-gray-700"}`}
+                            >
+                              {num} draws
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Summary Card */}
-        {selectedCount && allGamesFilled && selectionMode !== null && games.length > 0 && activeCountryName && (
-          <div className="mt-8 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-400 p-6 md:p-8 text-white shadow-2xl shadow-amber-200 relative overflow-hidden">
-            <div className="absolute inset-0 opacity-10">
-              <div className="w-full h-full" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
-            </div>
-            <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/20 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-yellow-300/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-            
-            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-              <div>
-                <p className="text-white/90 text-sm font-medium flex items-center gap-2">
-                  <Ticket size={16} /> Selected Package
-                </p>
-                <div className="flex items-baseline gap-3 mt-2">
-                  <span className="text-4xl md:text-5xl font-bold drop-shadow-2xl">
-                    ₹{totalPrice}
-                  </span>
-                  <span className="text-white/80 text-sm">/ total</span>
-                </div>
-                <div className="flex flex-wrap gap-3 mt-3">
-                  <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
-                    {selectedCount.totalGames} Games
-                  </span>
-                  {selectedCount.label && (
-                    <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
-                      {selectedCount.label}
-                    </span>
-                  )}
-                  <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
-                    {activeTicketTitle}
-                  </span>
-                  {selectedGameTypeTitle && (
-                    <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
-                      {selectedGameTypeTitle}
-                    </span>
-                  )}
-                  <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10 capitalize">
-                    {selectionMode === "quickpick" ? "QuickPick" : "Pick your numbers"}
-                  </span>
-                  {autoPlay && (
-                    <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
-                      {drawCount} draws
-                    </span>
-                  )}
-                  <span className="text-xs bg-green-500/40 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10 flex items-center gap-2">
-                    <Globe size={12} />
-                    {activeCountryObject?.name || activeCountryName}
-                    <img 
-                      src={activeCountryObject?.flag} 
-                      alt={activeCountryObject?.name}
-                      className="w-5 h-3 rounded-sm shadow-md"
-                    />
-                    <span className="text-yellow-300 text-[10px] font-mono font-bold">
-                      {activeCountryCode}
-                    </span>
-                    {urlCountry && <span className="text-yellow-300 text-[8px]">(URL)</span>}
-                  </span>
-                </div>
+        {selectedCount &&
+          allGamesFilled &&
+          selectionMode !== null &&
+          games.length > 0 &&
+          activeCountryName && (
+            <div className="mt-8 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-400 p-6 md:p-8 text-white shadow-2xl shadow-amber-200 relative overflow-hidden">
+              <div className="absolute inset-0 opacity-10">
+                <div
+                  className="w-full h-full"
+                  style={{
+                    backgroundImage:
+                      "radial-gradient(circle at 2px 2px, white 1px, transparent 0)",
+                    backgroundSize: "40px 40px",
+                  }}
+                ></div>
               </div>
-              <button
-                onClick={handleAddToCart}
-                disabled={entryLoading || !activeCountryName}
-                className="group bg-white text-amber-600 px-10 py-4 rounded-xl font-bold hover:scale-110 transition-all duration-500 w-full md:w-auto shadow-2xl flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {entryLoading ? (
-                  <>
-                    <Loader2 size={20} className="animate-spin" />
-                    Processing...
-                  </>
-                ) : !activeCountryName ? (
-                  <>
-                    <AlertCircle size={20} />
-                    Set Country First
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart size={20} className="group-hover:rotate-12 transition-transform duration-300" />
-                    Add to Cart
-                    <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform duration-300" />
-                  </>
-                )}
-              </button>
+              <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/20 rounded-full blur-3xl animate-pulse"></div>
+              <div
+                className="absolute -bottom-20 -left-20 w-64 h-64 bg-yellow-300/20 rounded-full blur-3xl animate-pulse"
+                style={{ animationDelay: "1s" }}
+              ></div>
+
+              <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div>
+                  <p className="text-white/90 text-sm font-medium flex items-center gap-2">
+                    <Ticket size={16} /> Selected Package
+                  </p>
+                  <div className="flex items-baseline gap-3 mt-2">
+                    <span className="text-4xl md:text-5xl font-bold drop-shadow-2xl">
+                      ₹{totalPrice}
+                    </span>
+                    <span className="text-white/80 text-sm">/ total</span>
+                  </div>
+                  <div className="flex flex-wrap gap-3 mt-3">
+                    <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
+                      {selectedCount.totalGames} Games
+                    </span>
+                    {selectedCount.label && (
+                      <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
+                        {selectedCount.label}
+                      </span>
+                    )}
+                    <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
+                      {activeTicketTitle}
+                    </span>
+                    {selectedGameTypeTitle && (
+                      <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
+                        {selectedGameTypeTitle}
+                      </span>
+                    )}
+                    <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10 capitalize">
+                      {selectionMode === "quickpick"
+                        ? "QuickPick"
+                        : "Pick your numbers"}
+                    </span>
+                    {autoPlay && (
+                      <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
+                        {drawCount} draws
+                      </span>
+                    )}
+                    <span className="text-xs bg-green-500/40 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10 flex items-center gap-2">
+                      <Globe size={12} />
+                      {activeCountryObject?.name || activeCountryName}
+                      <img
+                        src={activeCountryObject?.flag}
+                        alt={activeCountryObject?.name}
+                        className="w-5 h-3 rounded-sm shadow-md"
+                      />
+                      <span className="text-yellow-300 text-[10px] font-mono font-bold">
+                        {activeCountryCode}
+                      </span>
+                      {urlCountry && (
+                        <span className="text-yellow-300 text-[8px]">
+                          (URL)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleAddToCart}
+                  disabled={entryLoading || !activeCountryName}
+                  className="group bg-white text-amber-600 px-10 py-4 rounded-xl font-bold hover:scale-110 transition-all duration-500 w-full md:w-auto shadow-2xl flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {entryLoading ? (
+                    <>
+                      <Loader2 size={20} className="animate-spin" />
+                      Processing...
+                    </>
+                  ) : !activeCountryName ? (
+                    <>
+                      <AlertCircle size={20} />
+                      Set Country First
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart
+                        size={20}
+                        className="group-hover:rotate-12 transition-transform duration-300"
+                      />
+                      Add to Cart
+                      <ArrowRight
+                        size={18}
+                        className="group-hover:translate-x-2 transition-transform duration-300"
+                      />
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
 
       <style jsx>{`
@@ -1841,8 +1941,13 @@ const GameSelection = () => {
           animation: slide-in 0.3s ease-out;
         }
         @keyframes pulse {
-          0%, 100% { opacity: 0.5; }
-          50% { opacity: 1; }
+          0%,
+          100% {
+            opacity: 0.5;
+          }
+          50% {
+            opacity: 1;
+          }
         }
         .animate-pulse-slow {
           animation: pulse 2s ease-in-out infinite;
