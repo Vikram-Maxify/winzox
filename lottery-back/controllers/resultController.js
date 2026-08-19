@@ -2,6 +2,7 @@ const Result = require("../models/Result");
 const Bid = require("../models/Bid");
 const Market = require("../models/Market");
 const User = require("../models/authmodel");
+const BettingBonus = require("../models/BettingBonus");
 const mongoose = require("mongoose");
 
 // ==========================================================
@@ -22,10 +23,7 @@ const GAME_TYPES = [
 // FORMAT NUMBER
 // ==========================================================
 
-const formatWinningNumber = (
-  value,
-  gameType
-) => {
+const formatWinningNumber = (value, gameType) => {
   if (
     value === undefined ||
     value === null ||
@@ -43,6 +41,7 @@ const formatWinningNumber = (
           "Single winning number must be 0-9"
         );
       }
+
       return number;
 
     case "jodi":
@@ -51,6 +50,7 @@ const formatWinningNumber = (
           "Jodi winning number must be 00-99"
         );
       }
+
       return number.padStart(2, "0");
 
     case "panna":
@@ -59,6 +59,7 @@ const formatWinningNumber = (
           "Panna winning number must be 000-999"
         );
       }
+
       return number.padStart(3, "0");
 
     case "half-sangam":
@@ -67,6 +68,7 @@ const formatWinningNumber = (
           "Half Sangam winning number must be 1-3 digits"
         );
       }
+
       return number;
 
     case "full-sangam":
@@ -75,6 +77,7 @@ const formatWinningNumber = (
           "Full Sangam winning number must be 00-99"
         );
       }
+
       return number.padStart(2, "0");
 
     case "last-digit":
@@ -83,6 +86,7 @@ const formatWinningNumber = (
           "Last digit winning number must be 00-99"
         );
       }
+
       return number.padStart(2, "0");
 
     case "first-digit":
@@ -91,6 +95,7 @@ const formatWinningNumber = (
           "First digit winning number must be 00-99"
         );
       }
+
       return number.padStart(2, "0");
 
     default:
@@ -169,6 +174,243 @@ const checkBidWin = (
 };
 
 // ==========================================================
+// ADD REFERRAL BETTING BONUS
+// ==========================================================
+
+const addReferralBettingBonus = async (
+  winner,
+  winAmount
+) => {
+  try {
+    if (!winner || !winAmount || winAmount <= 0) {
+      return {
+        success: false,
+        bonus: 0,
+        message: "Invalid winner or win amount",
+      };
+    }
+
+    // ======================================================
+    // GET ACTIVE BETTING BONUS
+    // ======================================================
+
+    const bettingBonus =
+      await BettingBonus.findOne({
+        isActive: true,
+      });
+
+    if (!bettingBonus) {
+      return {
+        success: false,
+        bonus: 0,
+        message: "Betting bonus is inactive",
+      };
+    }
+
+    const percentage =
+      Number(bettingBonus.percentage) || 0;
+
+    if (
+      percentage <= 0 ||
+      percentage > 100
+    ) {
+      return {
+        success: false,
+        bonus: 0,
+        message: "Invalid betting bonus percentage",
+      };
+    }
+
+    // ======================================================
+    // FIND REFERRER
+    // ======================================================
+
+    let referrer = null;
+
+    // ------------------------------------------------------
+    // 1. referredByUser
+    // ------------------------------------------------------
+
+    if (winner.referredByUser) {
+      if (
+        mongoose.Types.ObjectId.isValid(
+          winner.referredByUser
+        )
+      ) {
+        referrer =
+          await User.findById(
+            winner.referredByUser
+          );
+      }
+    }
+
+    // ------------------------------------------------------
+    // 2. referredBy as ObjectId
+    // ------------------------------------------------------
+
+    if (
+      !referrer &&
+      winner.referredBy
+    ) {
+      if (
+        mongoose.Types.ObjectId.isValid(
+          winner.referredBy
+        )
+      ) {
+        referrer =
+          await User.findById(
+            winner.referredBy
+          );
+      }
+    }
+
+    // ------------------------------------------------------
+    // 3. referredBy as referral code
+    // ------------------------------------------------------
+
+    if (
+      !referrer &&
+      winner.referredBy
+    ) {
+      referrer =
+        await User.findOne({
+          referralCode:
+            String(winner.referredBy).trim(),
+        });
+    }
+
+    // ======================================================
+    // NO REFERRER
+    // ======================================================
+
+    if (!referrer) {
+      return {
+        success: false,
+        bonus: 0,
+        message: "No referrer found",
+      };
+    }
+
+    // ======================================================
+    // PREVENT SELF REFERRAL
+    // ======================================================
+
+    if (
+      String(referrer._id) ===
+      String(winner._id)
+    ) {
+      return {
+        success: false,
+        bonus: 0,
+        message: "Self referral is not allowed",
+      };
+    }
+
+    // ======================================================
+    // CALCULATE BONUS
+    // ======================================================
+
+    const referralBonus =
+      Number(
+        (
+          (Number(winAmount) * percentage) /
+          100
+        ).toFixed(2)
+      );
+
+    if (referralBonus <= 0) {
+      return {
+        success: false,
+        bonus: 0,
+        message: "Referral bonus is zero",
+      };
+    }
+
+    // ======================================================
+    // ADD TO REFERRER BALANCE + EARNING
+    // ======================================================
+
+    await User.updateOne(
+      {
+        _id: referrer._id,
+      },
+      {
+        $inc: {
+          balance: referralBonus,
+          referralEarning: referralBonus,
+        },
+      }
+    );
+
+    console.log(
+      "=================================================="
+    );
+
+    console.log(
+      "REFERRAL BETTING BONUS ADDED"
+    );
+
+    console.log(
+      "Winner:",
+      winner._id
+    );
+
+    console.log(
+      "Winner Name:",
+      winner.name
+    );
+
+    console.log(
+      "Winner Amount:",
+      winAmount
+    );
+
+    console.log(
+      "Bonus Percentage:",
+      percentage
+    );
+
+    console.log(
+      "Referrer:",
+      referrer._id
+    );
+
+    console.log(
+      "Referrer Name:",
+      referrer.name
+    );
+
+    console.log(
+      "Referral Bonus:",
+      referralBonus
+    );
+
+    console.log(
+      "=================================================="
+    );
+
+    return {
+      success: true,
+      bonus: referralBonus,
+      percentage,
+      referrerId: referrer._id,
+      referrerName: referrer.name,
+    };
+  } catch (error) {
+    console.error(
+      "Add Referral Betting Bonus Error:",
+      error
+    );
+
+    return {
+      success: false,
+      bonus: 0,
+      message: error.message,
+    };
+  }
+};
+
+// ==========================================================
 // DECLARE RESULT
 // ==========================================================
 
@@ -201,7 +443,8 @@ exports.declareResult = async (
 
     if (
       !winningNumber ||
-      typeof winningNumber !== "object"
+      typeof winningNumber !== "object" ||
+      Array.isArray(winningNumber)
     ) {
       return res.status(400).json({
         success: false,
@@ -300,7 +543,6 @@ exports.declareResult = async (
         data: {
           resultId:
             existingResult._id,
-
           winningNumber:
             existingResult.winningNumber,
         },
@@ -396,8 +638,16 @@ exports.declareResult = async (
     let totalPayout = 0;
     let totalWinningBids = 0;
 
+    let totalReferralBonus = 0;
+    let totalReferralBonusCount = 0;
+
     const winningBidsList = [];
     const losingBidsList = [];
+    const referralBonusList = [];
+
+    // ======================================================
+    // PROCESS EACH BID
+    // ======================================================
 
     for (
       const bid of pendingBids
@@ -412,9 +662,9 @@ exports.declareResult = async (
           bidGameType
         ];
 
-      // ----------------------------------------------------
+      // ====================================================
       // GAME TYPE NOT CONFIGURED
-      // ----------------------------------------------------
+      // ====================================================
 
       if (
         winningNum === undefined
@@ -424,14 +674,16 @@ exports.declareResult = async (
 
         await bid.save();
 
-        losingBidsList.push(bid);
+        losingBidsList.push(
+          bid
+        );
 
         continue;
       }
 
-      // ----------------------------------------------------
+      // ====================================================
       // CHECK WIN
-      // ----------------------------------------------------
+      // ====================================================
 
       const isWin =
         checkBidWin(
@@ -440,9 +692,9 @@ exports.declareResult = async (
           winningNum
         );
 
-      // ----------------------------------------------------
+      // ====================================================
       // WIN
-      // ----------------------------------------------------
+      // ====================================================
 
       if (isWin) {
         const winAmount =
@@ -455,7 +707,9 @@ exports.declareResult = async (
 
         totalWinningBids++;
 
-        // UPDATE USER BALANCE
+        // ==================================================
+        // FIND WINNER
+        // ==================================================
 
         const user =
           await User.findById(
@@ -463,6 +717,10 @@ exports.declareResult = async (
           );
 
         if (user) {
+          // ================================================
+          // ADD WINNING AMOUNT TO WINNER
+          // ================================================
+
           user.balance =
             (Number(
               user.balance
@@ -470,9 +728,52 @@ exports.declareResult = async (
             winAmount;
 
           await user.save();
+
+          // ================================================
+          // REFERRAL BETTING BONUS
+          // ================================================
+
+          const referralResult =
+            await addReferralBettingBonus(
+              user,
+              winAmount
+            );
+
+          if (
+            referralResult.success
+          ) {
+            totalReferralBonus +=
+              referralResult.bonus;
+
+            totalReferralBonusCount++;
+
+            referralBonusList.push({
+              winnerId:
+                user._id,
+
+              winnerName:
+                user.name,
+
+              winAmount,
+
+              percentage:
+                referralResult.percentage,
+
+              referrerId:
+                referralResult.referrerId,
+
+              referrerName:
+                referralResult.referrerName,
+
+              bonus:
+                referralResult.bonus,
+            });
+          }
         }
 
+        // ==================================================
         // UPDATE BID
+        // ==================================================
 
         bid.status = "won";
 
@@ -489,9 +790,9 @@ exports.declareResult = async (
         );
       }
 
-      // ----------------------------------------------------
+      // ====================================================
       // LOSS
-      // ----------------------------------------------------
+      // ====================================================
 
       else {
         bid.status = "lost";
@@ -576,6 +877,13 @@ exports.declareResult = async (
 
           totalPayout,
 
+          totalReferralBonus:
+            Number(
+              totalReferralBonus.toFixed(2)
+            ),
+
+          totalReferralBonusCount,
+
           gameTypes:
             Object.keys(
               formattedWinningNumbers
@@ -586,16 +894,22 @@ exports.declareResult = async (
           winningBidsList.map(
             (bid) => ({
               id: bid._id,
+
               userId:
                 bid.userId,
+
               gameType:
                 bid.gameType,
+
               number:
                 bid.number,
+
               bidAmount:
                 bid.bidAmount,
+
               winAmount:
                 bid.winAmount,
+
               resultNumber:
                 bid.resultNumber,
             })
@@ -605,18 +919,26 @@ exports.declareResult = async (
           losingBidsList.map(
             (bid) => ({
               id: bid._id,
+
               userId:
                 bid.userId,
+
               gameType:
                 bid.gameType,
+
               number:
                 bid.number,
+
               bidAmount:
                 bid.bidAmount,
+
               resultNumber:
                 bid.resultNumber,
             })
           ),
+
+        referralBonuses:
+          referralBonusList,
       },
     });
   } catch (error) {

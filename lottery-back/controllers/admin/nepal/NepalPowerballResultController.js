@@ -1,27 +1,352 @@
-const PowerballResult = require("../../../models/nepal/NepalPowerballResult");
-const GamePool = require("../../../models/nepal/NepalGamePool");
+const PowerballResult = require("../../../models/india/IndiaPowerballResult");
+const GamePool = require("../../../models/india/IndiaGamePool");
 const User = require("../../../models/authmodel");
-const mongoose = require('mongoose');
+const BettingBonus = require("../../../models/BettingBonus");
+const mongoose = require("mongoose");
 
-// Prize Divisions
+// ==========================================================
+// PRIZE DIVISIONS
+// ==========================================================
+
 const divisions = [
-  { division: 1, main: 7, powerball: true, prize: 40000000 },
-  { division: 2, main: 7, powerball: false, prize: 32769.7 },
-  { division: 3, main: 6, powerball: true, prize: 10874.15 },
-  { division: 4, main: 6, powerball: false, prize: 538.3 },
-  { division: 5, main: 5, powerball: true, prize: 206.7 },
-  { division: 6, main: 5, powerball: false, prize: 87.5 },
-  { division: 7, main: 4, powerball: true, prize: 49.5 },
-  { division: 8, main: 3, powerball: true, prize: 23.6 },
-  { division: 9, main: 2, powerball: true, prize: 14.4 },
+  {
+    division: 1,
+    main: 7,
+    powerball: true,
+    prize: 40000000,
+  },
+  {
+    division: 2,
+    main: 7,
+    powerball: false,
+    prize: 32769.7,
+  },
+  {
+    division: 3,
+    main: 6,
+    powerball: true,
+    prize: 10874.15,
+  },
+  {
+    division: 4,
+    main: 6,
+    powerball: false,
+    prize: 538.3,
+  },
+  {
+    division: 5,
+    main: 5,
+    powerball: true,
+    prize: 206.7,
+  },
+  {
+    division: 6,
+    main: 5,
+    powerball: false,
+    prize: 87.5,
+  },
+  {
+    division: 7,
+    main: 4,
+    powerball: true,
+    prize: 49.5,
+  },
+  {
+    division: 8,
+    main: 3,
+    powerball: true,
+    prize: 23.6,
+  },
+  {
+    division: 9,
+    main: 2,
+    powerball: true,
+    prize: 14.4,
+  },
 ];
 
-// ===============================
-// Create Powerball Result
-// ===============================
-exports.createPowerballResult = async (req, res) => {
+// ==========================================================
+// ADD REFERRAL BETTING BONUS
+// ==========================================================
+
+const addReferralBettingBonus = async (winner, winAmount) => {
   try {
-    const { gamePoolId, numbers, powerball } = req.body;
+    if (!winner || Number(winAmount) <= 0) {
+      return {
+        success: false,
+        bonus: 0,
+        percentage: 0,
+        referrerId: null,
+        referrerName: null,
+        message: "Invalid winner or winning amount",
+      };
+    }
+
+    // ======================================================
+    // GET ACTIVE BONUS SETTINGS
+    // ======================================================
+
+    const bettingBonus = await BettingBonus.findOne({
+      isActive: true,
+    });
+
+    if (!bettingBonus) {
+      return {
+        success: false,
+        bonus: 0,
+        percentage: 0,
+        referrerId: null,
+        referrerName: null,
+        message: "Betting bonus is inactive",
+      };
+    }
+
+    const percentage = Number(bettingBonus.percentage) || 0;
+
+    if (percentage <= 0 || percentage > 100) {
+      return {
+        success: false,
+        bonus: 0,
+        percentage,
+        referrerId: null,
+        referrerName: null,
+        message: "Invalid betting bonus percentage",
+      };
+    }
+
+    // ======================================================
+    // FIND REFERRER
+    // ======================================================
+
+    let referrer = null;
+
+    // ------------------------------------------------------
+    // 1. referredByUser
+    // ------------------------------------------------------
+
+    if (winner.referredByUser) {
+      if (
+        mongoose.Types.ObjectId.isValid(
+          winner.referredByUser
+        )
+      ) {
+        referrer = await User.findById(
+          winner.referredByUser
+        );
+      }
+    }
+
+    // ------------------------------------------------------
+    // 2. referredBy as ObjectId
+    // ------------------------------------------------------
+
+    if (!referrer && winner.referredBy) {
+      if (
+        mongoose.Types.ObjectId.isValid(
+          winner.referredBy
+        )
+      ) {
+        referrer = await User.findById(
+          winner.referredBy
+        );
+      }
+    }
+
+    // ------------------------------------------------------
+    // 3. referredBy as referral code
+    // ------------------------------------------------------
+
+    if (!referrer && winner.referredBy) {
+      referrer = await User.findOne({
+        referralCode: String(
+          winner.referredBy
+        ).trim(),
+      });
+    }
+
+    // ======================================================
+    // NO REFERRER
+    // ======================================================
+
+    if (!referrer) {
+      return {
+        success: false,
+        bonus: 0,
+        percentage,
+        referrerId: null,
+        referrerName: null,
+        message: "No referrer found",
+      };
+    }
+
+    // ======================================================
+    // SELF REFERRAL PROTECTION
+    // ======================================================
+
+    if (
+      String(referrer._id) ===
+      String(winner._id)
+    ) {
+      return {
+        success: false,
+        bonus: 0,
+        percentage,
+        referrerId: null,
+        referrerName: null,
+        message: "Self referral is not allowed",
+      };
+    }
+
+    // ======================================================
+    // CALCULATE REFERRAL BONUS
+    // ======================================================
+
+    const referralBonus = Number(
+      (
+        (Number(winAmount) * percentage) /
+        100
+      ).toFixed(2)
+    );
+
+    if (referralBonus <= 0) {
+      return {
+        success: false,
+        bonus: 0,
+        percentage,
+        referrerId: referrer._id,
+        referrerName: referrer.name,
+        message: "Referral bonus is zero",
+      };
+    }
+
+    // ======================================================
+    // ADD BONUS TO REFERRER ACCOUNT
+    // ======================================================
+
+    const updatedReferrer =
+      await User.findByIdAndUpdate(
+        referrer._id,
+        {
+          $inc: {
+            balance: referralBonus,
+            referralEarning: referralBonus,
+          },
+        },
+        {
+          new: true,
+        }
+      );
+
+    if (!updatedReferrer) {
+      return {
+        success: false,
+        bonus: 0,
+        percentage,
+        referrerId: referrer._id,
+        referrerName: referrer.name,
+        message: "Failed to update referrer account",
+      };
+    }
+
+    // ======================================================
+    // LOG
+    // ======================================================
+
+    console.log(
+      "=========================================="
+    );
+
+    console.log(
+      "INDIA POWERBALL REFERRAL BETTING BONUS"
+    );
+
+    console.log(
+      "Winner:",
+      winner.name
+    );
+
+    console.log(
+      "Winner ID:",
+      winner._id
+    );
+
+    console.log(
+      "Winning Amount:",
+      winAmount
+    );
+
+    console.log(
+      "Bonus Percentage:",
+      percentage + "%"
+    );
+
+    console.log(
+      "Referrer:",
+      updatedReferrer.name
+    );
+
+    console.log(
+      "Referrer ID:",
+      updatedReferrer._id
+    );
+
+    console.log(
+      "Referral Bonus:",
+      referralBonus
+    );
+
+    console.log(
+      "New Referrer Balance:",
+      updatedReferrer.balance
+    );
+
+    console.log(
+      "=========================================="
+    );
+
+    return {
+      success: true,
+      bonus: referralBonus,
+      percentage,
+      referrerId: updatedReferrer._id,
+      referrerName: updatedReferrer.name,
+      referrerBalance: updatedReferrer.balance,
+    };
+  } catch (error) {
+    console.error(
+      "Referral Betting Bonus Error:",
+      error
+    );
+
+    return {
+      success: false,
+      bonus: 0,
+      percentage: 0,
+      referrerId: null,
+      referrerName: null,
+      message: error.message,
+    };
+  }
+};
+
+// ==========================================================
+// CREATE POWERBALL RESULT
+// ==========================================================
+
+exports.createPowerballResult = async (
+  req,
+  res
+) => {
+  try {
+    const {
+      gamePoolId,
+      numbers,
+      powerball,
+    } = req.body;
+
+    // ======================================================
+    // VALIDATION
+    // ======================================================
 
     if (!gamePoolId) {
       return res.status(400).json({
@@ -30,23 +355,35 @@ exports.createPowerballResult = async (req, res) => {
       });
     }
 
-    if (!numbers || !Array.isArray(numbers) || numbers.length !== 7) {
+    if (
+      !Array.isArray(numbers) ||
+      numbers.length !== 7
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Exactly 7 winning numbers are required.",
+        message:
+          "Exactly 7 winning numbers are required.",
       });
     }
 
-    if (!powerball) {
+    if (
+      powerball === undefined ||
+      powerball === null ||
+      powerball === ""
+    ) {
       return res.status(400).json({
         success: false,
         message: "Powerball is required.",
       });
     }
 
-    // Validate game pool exists and is open
-    const gamePool = await GamePool.findById(gamePoolId);
-    
+    // ======================================================
+    // FIND GAME POOL
+    // ======================================================
+
+    const gamePool =
+      await GamePool.findById(gamePoolId);
+
     if (!gamePool) {
       return res.status(404).json({
         success: false,
@@ -57,57 +394,96 @@ exports.createPowerballResult = async (req, res) => {
     if (gamePool.status !== "Open") {
       return res.status(400).json({
         success: false,
-        message: "Game pool is already processed or closed.",
+        message:
+          "Game pool is already processed or closed.",
       });
     }
 
-    // Check if result already exists for this pool
-    const exists = await PowerballResult.findOne({ gamePoolId });
+    // ======================================================
+    // CHECK EXISTING RESULT
+    // ======================================================
+
+    const exists =
+      await PowerballResult.findOne({
+        gamePoolId,
+      });
 
     if (exists) {
       return res.status(400).json({
         success: false,
-        message: "Result already declared for this game pool.",
+        message:
+          "Result already declared for this game pool.",
       });
     }
 
-    // Create result with gamePoolId
-    const result = await PowerballResult.create({
-      gamePoolId,
-      drawNo: gamePool.drawNo,
-      numbers,
-      powerball,
-      createdBy: req.user.id,
-    });
+    // ======================================================
+    // CREATE RESULT
+    // ======================================================
 
-    // Update game pool with winning numbers
+    const result =
+      await PowerballResult.create({
+        gamePoolId,
+        drawNo: gamePool.drawNo,
+        numbers,
+        powerball,
+        createdBy: req.user.id,
+      });
+
+    // ======================================================
+    // PROCESS PLAYERS
+    // ======================================================
+
     let poolWinners = 0;
     let totalPrizeAmount = 0;
+
     const userUpdates = [];
 
+    let totalReferralBonus = 0;
+    let totalReferralBonusCount = 0;
+
+    const referralBonusUpdates = [];
+
+    // ======================================================
+    // PROCESS EVERY PLAYER
+    // ======================================================
+
     for (const player of gamePool.players) {
-      if (player.status !== "Pending") continue;
+      if (player.status !== "Pending") {
+        continue;
+      }
 
       let bestDivision = null;
       let bestGameNo = null;
 
+      // ====================================================
+      // CHECK EVERY GAME
+      // ====================================================
+
       for (const game of player.games) {
-        const matchedMain = game.numbers.filter((num) =>
-          numbers.includes(num)
-        ).length;
+        const matchedMain =
+          game.numbers.filter((num) =>
+            numbers.includes(num)
+          ).length;
 
-        const matchedPowerball = game.powerball === powerball;
+        const matchedPowerball =
+          String(game.powerball) ===
+          String(powerball);
 
-        const division = divisions.find(
-          (d) =>
-            d.main === matchedMain &&
-            d.powerball === matchedPowerball
-        );
+        const division =
+          divisions.find(
+            (d) =>
+              d.main === matchedMain &&
+              d.powerball ===
+                matchedPowerball
+          );
 
         if (
           division &&
-          (!bestDivision ||
-            division.division < bestDivision.division)
+          (
+            !bestDivision ||
+            division.division <
+              bestDivision.division
+          )
         ) {
           bestDivision = {
             division: division.division,
@@ -116,567 +492,1427 @@ exports.createPowerballResult = async (req, res) => {
             matchedPowerball,
             gameNo: game.gameNo,
           };
+
           bestGameNo = game.gameNo;
         }
       }
 
+      // ====================================================
+      // WINNER
+      // ====================================================
+
       if (bestDivision) {
         player.status = "Won";
+
         player.result = {
-          division: bestDivision.division,
-          prize: bestDivision.prize,
-          gameNo: bestGameNo,
+          division:
+            bestDivision.division,
+
+          prize:
+            bestDivision.prize,
+
+          gameNo:
+            bestGameNo,
+
+          referralBonus: 0,
+
+          referralPercentage: 0,
+
+          referrerId: null,
         };
+
         poolWinners++;
-        totalPrizeAmount += bestDivision.prize;
+
+        totalPrizeAmount +=
+          bestDivision.prize;
 
         if (player.user) {
           userUpdates.push({
             userId: player.user,
             amount: bestDivision.prize,
             playerId: player._id,
-            division: bestDivision.division,
-            gameNo: bestGameNo
+            division:
+              bestDivision.division,
+            gameNo: bestGameNo,
           });
         }
-      } else {
+      }
+
+      // ====================================================
+      // LOSER
+      // ====================================================
+
+      else {
         player.status = "Lost";
+
         player.result = {
           division: null,
           prize: 0,
+          gameNo: null,
+          referralBonus: 0,
+          referralPercentage: 0,
+          referrerId: null,
         };
       }
     }
 
-    // Update pool status
+    // ======================================================
+    // UPDATE GAME POOL
+    // ======================================================
+
     gamePool.status = "Completed";
+
     gamePool.resultDeclared = true;
+
     gamePool.winningNumbers = {
-      numbers: numbers,
-      powerball: powerball
+      numbers,
+      powerball,
     };
 
     await gamePool.save();
 
-    // Update user balances
+    // ======================================================
+    // UPDATE WINNER BALANCES
+    // ======================================================
+
     const updatedUsers = [];
+
     for (const update of userUpdates) {
       try {
-        const user = await User.findById(update.userId);
-        if (user) {
-          const oldBalance = user.balance || 0;
-          user.balance = oldBalance + update.amount;
-          await user.save();
-          
-          updatedUsers.push({
-            userId: user._id,
-            userName: user.name,
-            email: user.email,
-            oldBalance: oldBalance,
-            newBalance: user.balance,
-            amountAdded: update.amount,
-            division: update.division,
-            gameNo: update.gameNo
+        const user =
+          await User.findById(
+            update.userId
+          );
+
+        if (!user) {
+          console.error(
+            "Winner user not found:",
+            update.userId
+          );
+
+          continue;
+        }
+
+        // ==================================================
+        // ADD WINNING PRIZE TO WINNER
+        // ==================================================
+
+        const oldBalance =
+          Number(user.balance) || 0;
+
+        const prizeAmount =
+          Number(update.amount) || 0;
+
+        user.balance =
+          oldBalance + prizeAmount;
+
+        await user.save();
+
+        // ==================================================
+        // ADD REFERRAL BONUS
+        //
+        // Winner wins:
+        //
+        // Winner gets:
+        //      prizeAmount
+        //
+        // Referrer gets:
+        //      prizeAmount * percentage / 100
+        // ==================================================
+
+        const referralResult =
+          await addReferralBettingBonus(
+            user,
+            prizeAmount
+          );
+
+        // ==================================================
+        // FIND PLAYER
+        // ==================================================
+
+        const player =
+          gamePool.players.id(
+            update.playerId
+          );
+
+        // ==================================================
+        // SAVE REFERRAL DATA IN PLAYER RESULT
+        // ==================================================
+
+        if (player) {
+          player.result =
+            player.result || {};
+
+          if (referralResult.success) {
+            player.result.referralBonus =
+              referralResult.bonus;
+
+            player.result.referralPercentage =
+              referralResult.percentage;
+
+            player.result.referrerId =
+              referralResult.referrerId;
+          }
+        }
+
+        // ==================================================
+        // RESPONSE VALUES
+        // ==================================================
+
+        let referralBonus = 0;
+        let referralPercentage = 0;
+        let referrerId = null;
+        let referrerName = null;
+
+        if (referralResult.success) {
+          referralBonus =
+            referralResult.bonus;
+
+          referralPercentage =
+            referralResult.percentage;
+
+          referrerId =
+            referralResult.referrerId;
+
+          referrerName =
+            referralResult.referrerName;
+
+          totalReferralBonus +=
+            referralBonus;
+
+          totalReferralBonusCount++;
+
+          referralBonusUpdates.push({
+            winnerId: user._id,
+            winnerName: user.name,
+
+            prizeAmount,
+
+            percentage:
+              referralPercentage,
+
+            referrerId,
+
+            referrerName,
+
+            bonus:
+              referralBonus,
           });
         }
+
+        // ==================================================
+        // WINNER RESPONSE
+        // ==================================================
+
+        updatedUsers.push({
+          userId: user._id,
+
+          userName: user.name,
+
+          email: user.email,
+
+          oldBalance,
+
+          newBalance: user.balance,
+
+          amountAdded: prizeAmount,
+
+          division:
+            update.division,
+
+          gameNo:
+            update.gameNo,
+
+          referralBonus,
+
+          referralPercentage,
+
+          referrerId,
+
+          referrerName,
+        });
       } catch (error) {
-        console.error(`Error updating user ${update.userId}:`, error);
+        console.error(
+          `Error updating winner ${update.userId}:`,
+          error
+        );
       }
     }
 
-    res.status(201).json({
+    // ======================================================
+    // SAVE GAME POOL AGAIN
+    // Referral details are now stored
+    // ======================================================
+
+    await gamePool.save();
+
+    // ======================================================
+    // RESPONSE
+    // ======================================================
+
+    return res.status(201).json({
       success: true,
-      message: "Powerball result declared successfully. Winners have been credited.",
+
+      message:
+        "Powerball result declared successfully. Winners and referral bonuses have been credited.",
+
       result,
+
       poolProcessed: {
         id: gamePool._id,
-        drawNo: gamePool.drawNo,
-        totalPlayers: gamePool.totalPlayers,
-        totalWinners: poolWinners,
-        totalPrizeAmount: totalPrizeAmount,
+
+        drawNo:
+          gamePool.drawNo,
+
+        totalPlayers:
+          gamePool.totalPlayers,
+
+        totalWinners:
+          poolWinners,
+
+        totalPrizeAmount:
+          Number(
+            totalPrizeAmount.toFixed(2)
+          ),
+
+        totalReferralBonus:
+          Number(
+            totalReferralBonus.toFixed(2)
+          ),
+
+        totalReferralBonusCount,
       },
-      winnersUpdated: updatedUsers
+
+      winnersUpdated:
+        updatedUsers,
+
+      referralBonuses:
+        referralBonusUpdates,
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
+    console.error(
+      "Create India Powerball Result Error:",
+      error
+    );
+
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };
 
-// ===============================
-// Get All Results
-// ===============================
-exports.getAllPowerballResults = async (req, res) => {
-  try {
-    const results = await PowerballResult.find()
-      .populate("createdBy", "name email")
-      .populate("gamePoolId", "ticketType gameType gameCount totalPlayers")
-      .sort({ createdAt: -1 });
+// ==========================================================
+// GET ALL RESULTS
+// ==========================================================
 
-    res.json({
-      success: true,
-      total: results.length,
-      results: results,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+exports.getAllPowerballResults =
+  async (req, res) => {
+    try {
+      const results =
+        await PowerballResult.find()
+          .populate(
+            "createdBy",
+            "name email"
+          )
+          .populate(
+            "gamePoolId",
+            "ticketType gameType gameCount totalPlayers"
+          )
+          .sort({
+            createdAt: -1,
+          });
 
-// ===============================
-// Get Result By ID
-// ===============================
-exports.getPowerballResultById = async (req, res) => {
-  try {
-    const result = await PowerballResult.findById(req.params.id)
-      .populate("createdBy", "name email")
-      .populate("gamePoolId", "ticketType gameType gameCount totalPlayers players");
-
-    if (!result) {
-      return res.status(404).json({
+      return res.json({
+        success: true,
+        total: results.length,
+        results,
+      });
+    } catch (error) {
+      return res.status(500).json({
         success: false,
-        message: "Result not found.",
+        message: error.message,
       });
     }
+  };
 
-    const gamePool = await GamePool.findById(result.gamePoolId)
-      .populate("players.user", "name email balance username");
+// ==========================================================
+// GET RESULT BY ID
+// ==========================================================
 
-    const winnerDetails = gamePool?.players
-      .filter(p => p.status === "Won")
-      .map(p => ({
-        userId: p.user?._id,
-        userName: p.user?.name,
-        email: p.user?.email,
-        username: p.user?.username,
-        balance: p.user?.balance,
-        prize: p.result?.prize,
-        division: p.result?.division,
-        gameNo: p.result?.gameNo
-      })) || [];
+exports.getPowerballResultById =
+  async (req, res) => {
+    try {
+      const result =
+        await PowerballResult.findById(
+          req.params.id
+        )
+          .populate(
+            "createdBy",
+            "name email"
+          )
+          .populate(
+            "gamePoolId",
+            "ticketType gameType gameCount totalPlayers players"
+          );
 
-    const totalWinners = winnerDetails.length;
-    const totalPrize = winnerDetails.reduce((sum, w) => sum + (w.prize || 0), 0);
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          message: "Result not found.",
+        });
+      }
 
-    res.json({
-      success: true,
-      result,
-      winnerDetails,
-      totalWinners,
-      totalPrize
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+      const gamePool =
+        await GamePool.findById(
+          result.gamePoolId
+        )
+          .populate(
+            "players.user",
+            "name email username balance referralCode referredBy referredByUser"
+          );
 
-// ===============================
-// Delete Result
-// ===============================
-exports.deletePowerballResult = async (req, res) => {
-  try {
-    const result = await PowerballResult.findById(req.params.id);
+      const winnerDetails =
+        gamePool?.players
+          .filter(
+            (p) => p.status === "Won"
+          )
+          .map((p) => ({
+            userId: p.user?._id,
 
-    if (!result) {
-      return res.status(404).json({
+            userName:
+              p.user?.name,
+
+            email:
+              p.user?.email,
+
+            username:
+              p.user?.username,
+
+            balance:
+              p.user?.balance,
+
+            prize:
+              p.result?.prize || 0,
+
+            division:
+              p.result?.division,
+
+            gameNo:
+              p.result?.gameNo,
+
+            referralBonus:
+              p.result?.referralBonus || 0,
+
+            referralPercentage:
+              p.result?.referralPercentage ||
+              0,
+
+            referrerId:
+              p.result?.referrerId ||
+              null,
+          })) || [];
+
+      const totalWinners =
+        winnerDetails.length;
+
+      const totalPrize =
+        winnerDetails.reduce(
+          (sum, winner) =>
+            sum +
+            (Number(winner.prize) || 0),
+          0
+        );
+
+      const totalReferralBonus =
+        winnerDetails.reduce(
+          (sum, winner) =>
+            sum +
+            (Number(
+              winner.referralBonus
+            ) || 0),
+          0
+        );
+
+      return res.json({
+        success: true,
+
+        result,
+
+        winnerDetails,
+
+        totalWinners,
+
+        totalPrize,
+
+        totalReferralBonus,
+      });
+    } catch (error) {
+      return res.status(500).json({
         success: false,
-        message: "Result not found.",
+        message: error.message,
       });
     }
+  };
 
-    const gamePool = await GamePool.findById(result.gamePoolId);
+// ==========================================================
+// DELETE RESULT
+// ==========================================================
 
-    if (gamePool) {
-      // Get winning players
-      const winningPlayers = gamePool.players.filter(
-        player => player.status === "Won" && player.result && player.result.prize > 0
+exports.deletePowerballResult =
+  async (req, res) => {
+    try {
+      const result =
+        await PowerballResult.findById(
+          req.params.id
+        );
+
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          message: "Result not found.",
+        });
+      }
+
+      const gamePool =
+        await GamePool.findById(
+          result.gamePoolId
+        );
+
+      if (gamePool) {
+        const winningPlayers =
+          gamePool.players.filter(
+            (player) =>
+              player.status === "Won" &&
+              player.result &&
+              Number(
+                player.result.prize
+              ) > 0
+          );
+
+        const reversedUsers = [];
+
+        let totalReferralReversed = 0;
+
+        // ==================================================
+        // REVERSE WINNERS
+        // ==================================================
+
+        for (const player of winningPlayers) {
+          try {
+            if (!player.user) {
+              continue;
+            }
+
+            const user =
+              await User.findById(
+                player.user
+              );
+
+            if (!user) {
+              continue;
+            }
+
+            // ==============================================
+            // REVERSE WINNING PRIZE
+            // ==============================================
+
+            const oldBalance =
+              Number(user.balance) || 0;
+
+            const prizeAmount =
+              Number(
+                player.result.prize
+              ) || 0;
+
+            user.balance =
+              Math.max(
+                0,
+                oldBalance -
+                  prizeAmount
+              );
+
+            // ==============================================
+            // REVERSE REFERRAL BONUS
+            // ==============================================
+
+            const referralBonus =
+              Number(
+                player.result
+                  .referralBonus
+              ) || 0;
+
+            let referrer = null;
+
+            if (referralBonus > 0) {
+              // --------------------------------------------
+              // STORED REFERRER ID
+              // --------------------------------------------
+
+              if (
+                player.result.referrerId &&
+                mongoose.Types.ObjectId.isValid(
+                  player.result.referrerId
+                )
+              ) {
+                referrer =
+                  await User.findById(
+                    player.result.referrerId
+                  );
+              }
+
+              // --------------------------------------------
+              // referredByUser
+              // --------------------------------------------
+
+              if (
+                !referrer &&
+                user.referredByUser
+              ) {
+                if (
+                  mongoose.Types.ObjectId.isValid(
+                    user.referredByUser
+                  )
+                ) {
+                  referrer =
+                    await User.findById(
+                      user.referredByUser
+                    );
+                }
+              }
+
+              // --------------------------------------------
+              // referredBy ObjectId
+              // --------------------------------------------
+
+              if (
+                !referrer &&
+                user.referredBy
+              ) {
+                if (
+                  mongoose.Types.ObjectId.isValid(
+                    user.referredBy
+                  )
+                ) {
+                  referrer =
+                    await User.findById(
+                      user.referredBy
+                    );
+                }
+              }
+
+              // --------------------------------------------
+              // referredBy referral code
+              // --------------------------------------------
+
+              if (
+                !referrer &&
+                user.referredBy
+              ) {
+                referrer =
+                  await User.findOne({
+                    referralCode:
+                      String(
+                        user.referredBy
+                      ).trim(),
+                  });
+              }
+
+              // --------------------------------------------
+              // DEDUCT REFERRAL BONUS
+              // --------------------------------------------
+
+              if (referrer) {
+                await User.updateOne(
+                  {
+                    _id: referrer._id,
+                  },
+                  {
+                    $inc: {
+                      balance:
+                        -referralBonus,
+
+                      referralEarning:
+                        -referralBonus,
+                    },
+                  }
+                );
+
+                totalReferralReversed +=
+                  referralBonus;
+              }
+            }
+
+            await user.save();
+
+            reversedUsers.push({
+              userId: user._id,
+
+              userName:
+                user.name,
+
+              email:
+                user.email,
+
+              oldBalance,
+
+              newBalance:
+                user.balance,
+
+              amountDeducted:
+                prizeAmount,
+
+              division:
+                player.result
+                  .division,
+
+              referralBonusReversed:
+                referralBonus,
+
+              referrerId:
+                referrer
+                  ? referrer._id
+                  : null,
+
+              referrerName:
+                referrer
+                  ? referrer.name
+                  : null,
+            });
+          } catch (error) {
+            console.error(
+              `Error reversing balance for user ${player.user}:`,
+              error
+            );
+          }
+        }
+
+        // ==================================================
+        // RESET GAME POOL
+        // ==================================================
+
+        gamePool.status = "Open";
+
+        gamePool.resultDeclared = false;
+
+        gamePool.winningNumbers = null;
+
+        for (const player of gamePool.players) {
+          player.status = "Pending";
+
+          player.result = {
+            division: null,
+            prize: 0,
+            gameNo: null,
+            referralBonus: 0,
+            referralPercentage: 0,
+            referrerId: null,
+          };
+        }
+
+        await gamePool.save();
+
+        await result.deleteOne();
+
+        return res.json({
+          success: true,
+
+          message:
+            "Result deleted successfully. Game pool reset and winner/referral balances reversed.",
+
+          reversedUsers,
+
+          totalReversed:
+            reversedUsers.length,
+
+          totalReferralReversed:
+            Number(
+              totalReferralReversed.toFixed(2)
+            ),
+        });
+      }
+
+      await result.deleteOne();
+
+      return res.json({
+        success: true,
+        message:
+          "Result deleted successfully.",
+      });
+    } catch (error) {
+      console.error(
+        "Delete India Powerball Result Error:",
+        error
       );
 
-      // Reverse balances
-      const reversedUsers = [];
-      for (const player of winningPlayers) {
-        try {
-          if (player.user) {
-            const user = await User.findById(player.user);
-            if (user) {
-              const oldBalance = user.balance || 0;
-              user.balance = Math.max(0, oldBalance - player.result.prize);
-              await user.save();
-              
-              reversedUsers.push({
-                userId: user._id,
-                userName: user.name,
-                email: user.email,
-                oldBalance: oldBalance,
-                newBalance: user.balance,
-                amountDeducted: player.result.prize,
-                division: player.result.division
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  };
+
+// ==========================================================
+// GET RESULTS BY GAME POOL
+// ==========================================================
+
+exports.getResultsByGamePool =
+  async (req, res) => {
+    try {
+      const { gamePoolId } =
+        req.params;
+
+      const result =
+        await PowerballResult.findOne({
+          gamePoolId,
+        })
+          .populate(
+            "createdBy",
+            "name email"
+          )
+          .populate(
+            "gamePoolId",
+            "ticketType gameType gameCount totalPlayers"
+          );
+
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "No result found for this game pool.",
+        });
+      }
+
+      const gamePool =
+        await GamePool.findById(
+          gamePoolId
+        )
+          .populate(
+            "ticketType",
+            "name price"
+          )
+          .populate(
+            "gameCount",
+            "name count"
+          )
+          .populate(
+            "players.user",
+            "name email username balance"
+          );
+
+      const winners =
+        gamePool?.players
+          .filter(
+            (p) => p.status === "Won"
+          )
+          .map((p) => ({
+            userId:
+              p.user?._id,
+
+            userName:
+              p.user?.name,
+
+            email:
+              p.user?.email,
+
+            balance:
+              p.user?.balance,
+
+            prize:
+              p.result?.prize || 0,
+
+            division:
+              p.result?.division,
+
+            gameNo:
+              p.result?.gameNo,
+
+            referralBonus:
+              p.result?.referralBonus ||
+              0,
+
+            referralPercentage:
+              p.result
+                ?.referralPercentage ||
+              0,
+
+            referrerId:
+              p.result?.referrerId ||
+              null,
+          })) || [];
+
+      const totalReferralBonus =
+        winners.reduce(
+          (sum, winner) =>
+            sum +
+            (Number(
+              winner.referralBonus
+            ) || 0),
+          0
+        );
+
+      return res.json({
+        success: true,
+
+        result,
+
+        poolDetails:
+          gamePool,
+
+        winners,
+
+        totalWinners:
+          winners.length,
+
+        totalReferralBonus,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  };
+
+// ==========================================================
+// GET PENDING GAME BY PLAYER ID
+// ==========================================================
+
+exports.getPendingGameByPlayerId =
+  async (req, res) => {
+    try {
+      const { playerId } =
+        req.params;
+
+      if (!playerId) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Player ID is required.",
+        });
+      }
+
+      const gamePool =
+        await GamePool.findOne({
+          "players._id":
+            playerId,
+
+          status: "Open",
+        })
+          .populate(
+            "ticketType",
+            "name price description"
+          )
+          .populate(
+            "gameCount",
+            "name count"
+          )
+          .populate(
+            "players.user",
+            "name email username"
+          )
+          .lean();
+
+      if (!gamePool) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Pending game not found or already processed.",
+        });
+      }
+
+      const player =
+        gamePool.players.find(
+          (p) =>
+            p._id.toString() ===
+            playerId.toString()
+        );
+
+      if (!player) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Player not found in this game pool.",
+        });
+      }
+
+      const pendingGame = {
+        poolId:
+          gamePool._id,
+
+        playerId:
+          player._id,
+
+        userId:
+          player.user,
+
+        games:
+          player.games.map(
+            (game) => ({
+              gameNo:
+                game.gameNo,
+
+              numbers:
+                game.numbers,
+
+              powerball:
+                game.powerball,
+            })
+          ),
+
+        bidAmount:
+          player.bidAmount,
+
+        currencyDetails:
+          player.currencyDetails,
+
+        drawNo:
+          gamePool.drawNo,
+
+        ticketType:
+          gamePool.ticketType,
+
+        gameCount:
+          gamePool.gameCount,
+
+        playerStatus:
+          player.status,
+
+        poolStatus:
+          gamePool.status,
+
+        poolTotalPlayers:
+          gamePool.totalPlayers,
+
+        poolTotalAmount:
+          gamePool.totalAmount,
+
+        createdAt:
+          gamePool.createdAt,
+      };
+
+      return res.json({
+        success: true,
+        game: pendingGame,
+      });
+    } catch (error) {
+      console.error(error);
+
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  };
+
+// ==========================================================
+// GET ALL PENDING GAMES
+// ==========================================================
+
+exports.getAllPendingGames =
+  async (req, res) => {
+    try {
+      const gamePools =
+        await GamePool.find({
+          status: "Open",
+        })
+          .populate(
+            "ticketType",
+            "name price description"
+          )
+          .populate(
+            "gameCount",
+            "name totalGames price"
+          )
+          .populate(
+            "players.user",
+            "name email username"
+          );
+
+      const pendingGames = [];
+
+      gamePools.forEach((pool) => {
+        pool.players.forEach(
+          (player) => {
+            if (
+              player.status ===
+              "Pending"
+            ) {
+              pendingGames.push({
+                poolId:
+                  pool._id,
+
+                drawNo:
+                  pool.drawNo,
+
+                playerId:
+                  player._id,
+
+                userId:
+                  player.user?._id,
+
+                userName:
+                  player.user?.name,
+
+                userEmail:
+                  player.user?.email,
+
+                userUsername:
+                  player.user?.username,
+
+                bidAmount:
+                  player.bidAmount,
+
+                currencyDetails:
+                  player.currencyDetails,
+
+                games:
+                  player.games,
+
+                playerStatus:
+                  player.status,
+
+                poolStatus:
+                  pool.status,
+
+                createdAt:
+                  pool.createdAt,
               });
             }
           }
-        } catch (error) {
-          console.error(`Error reversing balance for user ${player.user}:`, error);
-        }
-      }
+        );
+      });
 
-      // Reset game pool
-      gamePool.status = "Open";
-      gamePool.resultDeclared = false;
-      gamePool.winningNumbers = null;
-      
-      for (const player of gamePool.players) {
-        player.status = "Pending";
-        player.result = {
-          division: null,
-          prize: 0
-        };
-      }
-      
-      await gamePool.save();
-
-      await result.deleteOne();
-
-      res.json({
+      return res.json({
         success: true,
-        message: `Result deleted successfully. Game pool has been reset and balances reversed.`,
-        reversedUsers: reversedUsers,
-        totalReversed: reversedUsers.length
+
+        total:
+          pendingGames.length,
+
+        games:
+          pendingGames,
       });
-    } else {
-      await result.deleteOne();
-      res.json({
-        success: true,
-        message: `Result deleted successfully.`,
-      });
-    }
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+    } catch (error) {
+      console.error(error);
 
-// ===============================
-// Get Results by Game Pool
-// ===============================
-exports.getResultsByGamePool = async (req, res) => {
-  try {
-    const { gamePoolId } = req.params;
-
-    const result = await PowerballResult.findOne({ gamePoolId })
-      .populate("createdBy", "name email")
-      .populate("gamePoolId", "ticketType gameType gameCount totalPlayers");
-
-    if (!result) {
-      return res.status(404).json({
+      return res.status(500).json({
         success: false,
-        message: "No result found for this game pool.",
+        message: error.message,
       });
     }
+  };
 
-    const gamePool = await GamePool.findById(gamePoolId)
-      .populate("ticketType", "name price")
-      .populate("gameCount", "name count")
-      .populate("players.user", "name email username balance");
+// ==========================================================
+// GET GAME POOL DETAILS
+// ==========================================================
 
-    // Get winners with their prizes
-    const winners = gamePool?.players
-      .filter(p => p.status === "Won")
-      .map(p => ({
-        userId: p.user?._id,
-        userName: p.user?.name,
-        email: p.user?.email,
-        balance: p.user?.balance,
-        prize: p.result?.prize,
-        division: p.result?.division
-      })) || [];
+exports.getGamePoolDetails =
+  async (req, res) => {
+    try {
+      const { poolId } =
+        req.params;
 
-    res.json({
-      success: true,
-      result,
-      poolDetails: gamePool,
-      winners: winners,
-      totalWinners: winners.length
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+      const gamePool =
+        await GamePool.findById(
+          poolId
+        )
+          .populate(
+            "ticketType",
+            "name price description"
+          )
+          .populate(
+            "gameCount",
+            "name totalGames price"
+          )
+          .populate(
+            "players.user",
+            "name email username balance"
+          );
 
-// ===============================
-// Get Pending Game by Player ID
-// ===============================
-exports.getPendingGameByPlayerId = async (req, res) => {
-  try {
-    const { playerId } = req.params;
-
-    if (!playerId) {
-      return res.status(400).json({
-        success: false,
-        message: "Player ID is required.",
-      });
-    }
-
-    const gamePool = await GamePool.findOne({
-      "players._id": playerId,
-      status: "Open"
-    })
-    .populate("ticketType", "name price description")
-    .populate("gameCount", "name count")
-    .populate("players.user", "name email username")
-    .lean();
-
-    if (!gamePool) {
-      return res.status(404).json({
-        success: false,
-        message: "Pending game not found or already processed.",
-      });
-    }
-
-    const player = gamePool.players.find(
-      (p) => p._id.toString() === playerId.toString()
-    );
-
-    if (!player) {
-      return res.status(404).json({
-        success: false,
-        message: "Player not found in this game pool.",
-      });
-    }
-
-    const pendingGame = {
-      poolId: gamePool._id,
-      playerId: player._id,
-      userId: player.user,
-      games: player.games.map(game => ({
-        gameNo: game.gameNo,
-        numbers: game.numbers,
-        powerball: game.powerball,
-      })),
-      bidAmount: player.bidAmount,
-      currencyDetails: player.currencyDetails,
-      drawNo: gamePool.drawNo,
-      ticketType: gamePool.ticketType,
-      gameCount: gamePool.gameCount,
-      playerStatus: player.status,
-      poolStatus: gamePool.status,
-      poolTotalPlayers: gamePool.totalPlayers,
-      poolTotalAmount: gamePool.totalAmount,
-      createdAt: gamePool.createdAt,
-    };
-
-    res.json({
-      success: true,
-      game: pendingGame,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ===============================
-// Get All Pending Games
-// ===============================
-exports.getAllPendingGames = async (req, res) => {
-  try {
-    const gamePools = await GamePool.find({
-      status: "Open",
-    })
-      .populate("ticketType", "name price description")
-      .populate("gameCount", "name totalGames price")
-      .populate("players.user", "name email username");
-
-    const pendingGames = [];
-
-    gamePools.forEach((pool) => {
-      pool.players.forEach((player) => {
-        if (player.status === "Pending") {
-          pendingGames.push({
-            poolId: pool._id,
-            drawNo: pool.drawNo,
-            playerId: player._id,
-            userId: player.user?._id,
-            userName: player.user?.name,
-            userEmail: player.user?.email,
-            userUsername: player.user?.username,
-            bidAmount: player.bidAmount,
-            currencyDetails: player.currencyDetails,
-            games: player.games,
-            playerStatus: player.status,
-            poolStatus: pool.status,
-            createdAt: pool.createdAt,
-          });
-        }
-      });
-    });
-
-    res.json({
-      success: true,
-      total: pendingGames.length,
-      games: pendingGames,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ===============================
-// Get Game Pool Details
-// ===============================
-exports.getGamePoolDetails = async (req, res) => {
-  try {
-    const { poolId } = req.params;
-
-    const gamePool = await GamePool.findById(poolId)
-      .populate("ticketType", "name price description")
-      .populate("gameCount", "name totalGames price")
-      .populate("players.user", "name email username balance");
-
-    if (!gamePool) {
-      return res.status(404).json({
-        success: false,
-        message: "Game pool not found.",
-      });
-    }
-
-    // Calculate statistics
-    const totalPlayers = gamePool.players.length;
-    const pendingPlayers = gamePool.players.filter(p => p.status === "Pending").length;
-    const wonPlayers = gamePool.players.filter(p => p.status === "Won").length;
-    const lostPlayers = gamePool.players.filter(p => p.status === "Lost").length;
-    
-    const totalPrize = gamePool.players
-      .filter(p => p.status === "Won")
-      .reduce((sum, p) => sum + (p.result?.prize || 0), 0);
-
-    res.json({
-      success: true,
-      pool: gamePool,
-      statistics: {
-        totalPlayers,
-        pendingPlayers,
-        wonPlayers,
-        lostPlayers,
-        totalPrize
-      }
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ===============================
-// Get User's Winning History
-// ===============================
-exports.getUserWinningHistory = async (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    const gamePools = await GamePool.find({
-      "players.user": userId,
-      "players.status": "Won",
-      resultDeclared: true
-    })
-    .populate("ticketType", "name price")
-    .populate("gameCount", "name totalGames")
-    .sort({ createdAt: -1 });
-
-    const winningHistory = [];
-    let totalEarnings = 0;
-
-    gamePools.forEach(pool => {
-      const player = pool.players.find(
-        p => p.user.toString() === userId.toString() && p.status === "Won"
-      );
-      
-      if (player && player.result) {
-        totalEarnings += player.result.prize || 0;
-        winningHistory.push({
-          drawNo: pool.drawNo,
-          gamePoolId: pool._id,
-          ticketType: pool.ticketType,
-          gameCount: pool.gameCount,
-          division: player.result.division,
-          prize: player.result.prize,
-          gameNo: player.result.gameNo,
-          winningNumbers: pool.winningNumbers,
-          declaredAt: pool.updatedAt || pool.createdAt,
-          status: pool.status
+      if (!gamePool) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Game pool not found.",
         });
       }
-    });
 
-    res.json({
-      success: true,
-      total: winningHistory.length,
-      totalEarnings: totalEarnings,
-      history: winningHistory
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+      const totalPlayers =
+        gamePool.players.length;
 
-// ===============================
-// Get User's Balance
-// ===============================
-exports.getUserBalance = async (req, res) => {
-  try {
-    const userId = req.user.id;
+      const pendingPlayers =
+        gamePool.players.filter(
+          (p) =>
+            p.status ===
+            "Pending"
+        ).length;
 
-    const user = await User.findById(userId).select("balance name email username");
+      const wonPlayers =
+        gamePool.players.filter(
+          (p) =>
+            p.status ===
+            "Won"
+        ).length;
 
-    if (!user) {
-      return res.status(404).json({
+      const lostPlayers =
+        gamePool.players.filter(
+          (p) =>
+            p.status ===
+            "Lost"
+        ).length;
+
+      const totalPrize =
+        gamePool.players
+          .filter(
+            (p) =>
+              p.status ===
+              "Won"
+          )
+          .reduce(
+            (sum, p) =>
+              sum +
+              (
+                Number(
+                  p.result?.prize
+                ) || 0
+              ),
+            0
+          );
+
+      const totalReferralBonus =
+        gamePool.players
+          .filter(
+            (p) =>
+              p.status ===
+              "Won"
+          )
+          .reduce(
+            (sum, p) =>
+              sum +
+              (
+                Number(
+                  p.result
+                    ?.referralBonus
+                ) || 0
+              ),
+            0
+          );
+
+      return res.json({
+        success: true,
+
+        pool: gamePool,
+
+        statistics: {
+          totalPlayers,
+
+          pendingPlayers,
+
+          wonPlayers,
+
+          lostPlayers,
+
+          totalPrize,
+
+          totalReferralBonus,
+        },
+      });
+    } catch (error) {
+      console.error(error);
+
+      return res.status(500).json({
         success: false,
-        message: "User not found.",
+        message: error.message,
       });
     }
+  };
 
-    res.json({
-      success: true,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        username: user.username,
-        balance: user.balance || 0
+// ==========================================================
+// GET USER WINNING HISTORY
+// ==========================================================
+
+exports.getUserWinningHistory =
+  async (req, res) => {
+    try {
+      const userId =
+        req.user.id;
+
+      const gamePools =
+        await GamePool.find({
+          "players.user":
+            userId,
+
+          "players.status":
+            "Won",
+
+          resultDeclared:
+            true,
+        })
+          .populate(
+            "ticketType",
+            "name price"
+          )
+          .populate(
+            "gameCount",
+            "name totalGames"
+          )
+          .sort({
+            createdAt: -1,
+          });
+
+      const winningHistory = [];
+
+      let totalEarnings = 0;
+
+      let totalReferralBonus = 0;
+
+      gamePools.forEach(
+        (pool) => {
+          const player =
+            pool.players.find(
+              (p) =>
+                p.user.toString() ===
+                  userId.toString() &&
+                p.status ===
+                  "Won"
+            );
+
+          if (
+            player &&
+            player.result
+          ) {
+            const prize =
+              Number(
+                player.result.prize
+              ) || 0;
+
+            const referralBonus =
+              Number(
+                player.result
+                  .referralBonus
+              ) || 0;
+
+            totalEarnings +=
+              prize;
+
+            totalReferralBonus +=
+              referralBonus;
+
+            winningHistory.push({
+              drawNo:
+                pool.drawNo,
+
+              gamePoolId:
+                pool._id,
+
+              ticketType:
+                pool.ticketType,
+
+              gameCount:
+                pool.gameCount,
+
+              division:
+                player.result
+                  .division,
+
+              prize,
+
+              gameNo:
+                player.result
+                  .gameNo,
+
+              referralBonus,
+
+              referralPercentage:
+                player.result
+                  .referralPercentage ||
+                0,
+
+              winningNumbers:
+                pool.winningNumbers,
+
+              declaredAt:
+                pool.updatedAt ||
+                pool.createdAt,
+
+              status:
+                pool.status,
+            });
+          }
+        }
+      );
+
+      return res.json({
+        success: true,
+
+        total:
+          winningHistory.length,
+
+        totalEarnings,
+
+        totalReferralBonus,
+
+        history:
+          winningHistory,
+      });
+    } catch (error) {
+      console.error(error);
+
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  };
+
+// ==========================================================
+// GET USER BALANCE
+// ==========================================================
+
+exports.getUserBalance =
+  async (req, res) => {
+    try {
+      const userId =
+        req.user.id;
+
+      const user =
+        await User.findById(
+          userId
+        ).select(
+          "balance name email username"
+        );
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "User not found.",
+        });
       }
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+
+      return res.json({
+        success: true,
+
+        user: {
+          id: user._id,
+
+          name: user.name,
+
+          email: user.email,
+
+          username:
+            user.username,
+
+          balance:
+            user.balance || 0,
+        },
+      });
+    } catch (error) {
+      console.error(error);
+
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  };
