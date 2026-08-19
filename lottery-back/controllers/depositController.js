@@ -3,10 +3,9 @@ const DepositSettings = require("../models/DepositSettings");
 const User = require("../models/authmodel");
 const mongoose = require("mongoose");
 const ReferralCommission = require("../models/ReferralCommission");
+const ReferralLevel = require("../models/ReferralLevel");
 const uploadToImgBB = require("../utils/uploadToImgBB");
 const CurrencyRate = require("../models/CurrencyRate");
-
-
 
 // ==========================================
 // Create Deposit Request
@@ -21,10 +20,6 @@ exports.createDeposit = async (req, res) => {
             methodType,
             methodTitle,
         } = req.body;
-
-        // -------------------------
-        // Validation
-        // -------------------------
 
         if (
             !amount ||
@@ -45,10 +40,6 @@ exports.createDeposit = async (req, res) => {
             });
         }
 
-        // -------------------------
-        // User
-        // -------------------------
-
         const user = await User.findById(userId);
 
         if (!user) {
@@ -65,13 +56,10 @@ exports.createDeposit = async (req, res) => {
             });
         }
 
-        // -------------------------
-        // Country Deposit Settings
-        // -------------------------
-
-        const settings = await DepositSettings.findOne({
-            country: user.country.toUpperCase(),
-        });
+        const settings =
+            await DepositSettings.findOne({
+                country: user.country.toUpperCase(),
+            });
 
         if (!settings) {
             return res.status(404).json({
@@ -80,16 +68,13 @@ exports.createDeposit = async (req, res) => {
             });
         }
 
-        // -------------------------
-        // Find Selected Method
-        // -------------------------
-
-        const method = settings.methods.find(
-            (m) =>
-                m.type === methodType &&
-                m.title === methodTitle &&
-                m.status === true
-        );
+        const method =
+            settings.methods.find(
+                (m) =>
+                    m.type === methodType &&
+                    m.title === methodTitle &&
+                    m.status === true
+            );
 
         if (!method) {
             return res.status(404).json({
@@ -97,10 +82,6 @@ exports.createDeposit = async (req, res) => {
                 message: "Payment method not found",
             });
         }
-
-        // -------------------------
-        // Min Max Validation
-        // -------------------------
 
         if (amount < method.minimumDeposit) {
             return res.status(400).json({
@@ -116,13 +97,11 @@ exports.createDeposit = async (req, res) => {
             });
         }
 
-        // -------------------------
-        // Duplicate Transaction
-        // -------------------------
-
-        const already = await Deposit.findOne({
-            transactionId: transactionId.trim(),
-        });
+        const already =
+            await Deposit.findOne({
+                transactionId:
+                    transactionId.trim(),
+            });
 
         if (already) {
             return res.status(400).json({
@@ -131,58 +110,44 @@ exports.createDeposit = async (req, res) => {
             });
         }
 
-        // -------------------------
-        // Screenshot
-        // -------------------------
-
         let screenshot = "";
 
         if (req.file) {
-
-            screenshot = await uploadToImgBB(req.file);
-
+            screenshot =
+                await uploadToImgBB(req.file);
         }
-        // -------------------------
-        // Create Deposit
-        // -------------------------
 
-        const deposit = await Deposit.create({
-            user: user._id,
-
-            country: settings.country,
-
-            currency: settings.currency,
-
-            methodType,
-
-            methodTitle,
-
-            amount,
-
-            transactionId: transactionId.trim(),
-
-            screenshot,
-
-            status: "pending",
-        });
+        const deposit =
+            await Deposit.create({
+                user: user._id,
+                country: settings.country,
+                currency: settings.currency,
+                methodType,
+                methodTitle,
+                amount,
+                transactionId:
+                    transactionId.trim(),
+                screenshot,
+                status: "pending",
+            });
 
         return res.status(201).json({
             success: true,
-            message: "Deposit request submitted successfully",
+            message:
+                "Deposit request submitted successfully",
             deposit,
         });
 
     } catch (error) {
-
         console.log(error);
 
         return res.status(500).json({
             success: false,
             message: error.message,
         });
-
     }
 };
+
 
 // ==========================================
 // Get Logged In User Deposit History
@@ -191,34 +156,48 @@ exports.getUserDeposits = async (req, res) => {
     try {
         const userId = req.user.id;
 
-        const page = Number(req.query.page) || 1;
-        const limit = Number(req.query.limit) || 10;
+        const page =
+            Number(req.query.page) || 1;
 
-        const skip = (page - 1) * limit;
+        const limit =
+            Number(req.query.limit) || 10;
+
+        const skip =
+            (page - 1) * limit;
 
         const filter = {
             user: userId,
         };
 
-        // Status Filter
         if (req.query.status) {
-            filter.status = req.query.status;
+            filter.status =
+                req.query.status;
         }
 
-        const total = await Deposit.countDocuments(filter);
+        const total =
+            await Deposit.countDocuments(
+                filter
+            );
 
-        const deposits = await Deposit.find(filter)
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit);
+        const deposits =
+            await Deposit.find(filter)
+                .sort({
+                    createdAt: -1,
+                })
+                .skip(skip)
+                .limit(limit);
 
         return res.status(200).json({
             success: true,
             currentPage: page,
-            totalPages: Math.ceil(total / limit),
+            totalPages:
+                Math.ceil(
+                    total / limit
+                ),
             totalRecords: total,
             deposits,
         });
+
     } catch (error) {
         console.log(error);
 
@@ -229,17 +208,22 @@ exports.getUserDeposits = async (req, res) => {
     }
 };
 
+
 // ==========================================
 // Get Single Deposit
 // ==========================================
-exports.getDepositDetails = async (req, res) => {
+exports.getDepositDetails = async (
+    req,
+    res
+) => {
     try {
         const { id } = req.params;
 
-        const deposit = await Deposit.findOne({
-            _id: id,
-            user: req.user.id,
-        });
+        const deposit =
+            await Deposit.findOne({
+                _id: id,
+                user: req.user.id,
+            });
 
         if (!deposit) {
             return res.status(404).json({
@@ -254,105 +238,120 @@ exports.getDepositDetails = async (req, res) => {
         });
 
     } catch (error) {
-
         console.log(error);
 
         return res.status(500).json({
             success: false,
             message: error.message,
         });
-
     }
 };
+
 
 // ==========================================
 // Admin - Get All Deposits
 // ==========================================
-exports.getAllDeposits = async (req, res) => {
+exports.getAllDeposits = async (
+    req,
+    res
+) => {
     try {
+        const page =
+            Number(req.query.page) || 1;
 
-        const page = Number(req.query.page) || 1;
-        const limit = Number(req.query.limit) || 20;
-        const skip = (page - 1) * limit;
+        const limit =
+            Number(req.query.limit) || 20;
+
+        const skip =
+            (page - 1) * limit;
 
         const filter = {};
 
-        // Status Filter
         if (req.query.status) {
-            filter.status = req.query.status;
+            filter.status =
+                req.query.status;
         }
 
-        // Country Filter
         if (req.query.country) {
-            filter.country = req.query.country.toUpperCase();
+            filter.country =
+                req.query.country.toUpperCase();
         }
 
-        // Method Filter
         if (req.query.methodType) {
-            filter.methodType = req.query.methodType;
+            filter.methodType =
+                req.query.methodType;
         }
 
-        // User Search
         if (req.query.search) {
-
-            const users = await User.find({
-                $or: [
-                    {
-                        name: {
-                            $regex: req.query.search,
-                            $options: "i",
+            const users =
+                await User.find({
+                    $or: [
+                        {
+                            name: {
+                                $regex:
+                                    req.query.search,
+                                $options: "i",
+                            },
                         },
-                    },
-                    {
-                        email: {
-                            $regex: req.query.search,
-                            $options: "i",
+                        {
+                            email: {
+                                $regex:
+                                    req.query.search,
+                                $options: "i",
+                            },
                         },
-                    },
-                    {
-                        mobile: {
-                            $regex: req.query.search,
-                            $options: "i",
+                        {
+                            mobile: {
+                                $regex:
+                                    req.query.search,
+                                $options: "i",
+                            },
                         },
-                    },
-                ],
-            }).select("_id");
+                    ],
+                }).select("_id");
 
             filter.user = {
-                $in: users.map((u) => u._id),
+                $in: users.map(
+                    (u) => u._id
+                ),
             };
         }
 
-        const total = await Deposit.countDocuments(filter);
+        const total =
+            await Deposit.countDocuments(
+                filter
+            );
 
-        const deposits = await Deposit.find(filter)
-            .populate(
-                "user",
-                "name email mobile country balance"
-            )
-            .sort({
-                createdAt: -1,
-            })
-            .skip(skip)
-            .limit(limit);
+        const deposits =
+            await Deposit.find(filter)
+                .populate(
+                    "user",
+                    "name email mobile country balance"
+                )
+                .sort({
+                    createdAt: -1,
+                })
+                .skip(skip)
+                .limit(limit);
 
         return res.status(200).json({
             success: true,
             currentPage: page,
-            totalPages: Math.ceil(total / limit),
+            totalPages:
+                Math.ceil(
+                    total / limit
+                ),
             totalRecords: total,
             deposits,
         });
 
     } catch (error) {
-
         console.log(error);
 
         return res.status(500).json({
             success: false,
             message: error.message,
         });
-
     }
 };
 
@@ -360,20 +359,22 @@ exports.getAllDeposits = async (req, res) => {
 // ==========================================
 // Admin Pending Deposits
 // ==========================================
-exports.getPendingDeposits = async (req, res) => {
-
+exports.getPendingDeposits = async (
+    req,
+    res
+) => {
     try {
-
-        const deposits = await Deposit.find({
-            status: "pending",
-        })
-            .populate(
-                "user",
-                "name email mobile country"
-            )
-            .sort({
-                createdAt: -1,
-            });
+        const deposits =
+            await Deposit.find({
+                status: "pending",
+            })
+                .populate(
+                    "user",
+                    "name email mobile country"
+                )
+                .sort({
+                    createdAt: -1,
+                });
 
         return res.status(200).json({
             success: true,
@@ -382,213 +383,487 @@ exports.getPendingDeposits = async (req, res) => {
         });
 
     } catch (error) {
-
         console.log(error);
 
         return res.status(500).json({
             success: false,
             message: error.message,
         });
-
     }
-
 };
 
 
 // ==========================================
 // Admin - Approve Deposit
 // ==========================================
-// Currency conversion rates (you should fetch these from a live API)
+exports.approveDeposit = async (
+    req,
+    res
+) => {
+    const session =
+        await mongoose.startSession();
 
-
-exports.approveDeposit = async (req, res) => {
-  const session = await mongoose.startSession();
-
-  try {
-    session.startTransaction();
-
-    const { id } = req.params;
-    const { remark } = req.body;
-
-    const deposit = await Deposit.findById(id).session(session);
-
-    if (!deposit) {
-      await session.abortTransaction();
-      session.endSession();
-
-      return res.status(404).json({
-        success: false,
-        message: "Deposit not found",
-      });
-    }
-
-    // Prevent double approval
-    if (deposit.status !== "pending") {
-      await session.abortTransaction();
-      session.endSession();
-
-      return res.status(400).json({
-        success: false,
-        message: `Deposit already ${deposit.status}`,
-      });
-    }
-
-    const user = await User.findById(deposit.user).session(session);
-
-    if (!user) {
-      await session.abortTransaction();
-      session.endSession();
-
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // ==========================
-    // Currency Conversion - Get rate from database
-    // ==========================
-    let amountInINR = Number(deposit.amount);
-    let conversionRate = 1;
-    let currencyCode = 'INR';
-    
-    const countryCode = deposit.country || 'IN';
-    
-    console.log('Country Code:', countryCode);
-
-    // Fetch currency rate from database
-    if (countryCode) {
-      const currencyRate = await CurrencyRate.findOne({ 
-        countryCode: countryCode,
-        status: true // Only fetch active rates
-      }).session(session);
-
-      if (currencyRate) {
-        conversionRate = Number(currencyRate.rate);
-        currencyCode = currencyRate.currencyCode;
-        amountInINR = Number(deposit.amount) * conversionRate;
-        
-        console.log(`Rate found: ${conversionRate} for ${countryCode}`);
-      } else {
-        console.log(`No active rate found for ${countryCode}, using default (1:1)`);
-      }
-    }
-
-    // Count previous approved deposits
-    const approvedRechargeCount = await Deposit.countDocuments({
-      user: user._id,
-      status: "approved",
-    }).session(session);
-
-    let commissionPercent = 0;
-
-    if (approvedRechargeCount === 0) {
-      commissionPercent = 20; // 1st Recharge
-    } else if (approvedRechargeCount === 1) {
-      commissionPercent = 3; // 2nd Recharge
-    } else if (approvedRechargeCount === 2) {
-      commissionPercent = 2; // 3rd Recharge
-    }
-
-    // Credit deposit amount to user (in INR)
-    user.balance += amountInINR;
-    await user.save({ session });
-
-    let referralCommission = null;
-
-    // ==========================
-    // Referral Commission (based on INR amount)
-    // ==========================
-    if (commissionPercent > 0 && user.referredByUser) {
-      const referrer = await User.findById(user.referredByUser).session(
-        session
-      );
-
-      if (referrer) {
-        const commission = (amountInINR * commissionPercent) / 100;
-
-        // Credit referrer balance
-        referrer.balance += commission;
-
-        // Total referral earning
-        referrer.referralEarning += commission;
-
-        await referrer.save({ session });
-
-        // Save referral commission history
-        referralCommission = await ReferralCommission.create(
-          [
-            {
-              referrer: referrer._id,
-              referredUser: user._id,
-              deposit: deposit._id,
-              depositAmount: deposit.amount,
-              depositAmountINR: amountInINR,
-              currencyCode: currencyCode,
-              percentage: commissionPercent,
-              commission,
-              rechargeNumber: approvedRechargeCount + 1,
-              status: "credited",
-            },
-          ],
-          { session }
-        );
-      }
-    }
-
-    // Update Deposit
-    deposit.status = "approved";
-    deposit.approvedBy = req.user.id;
-    deposit.approvedAt = new Date();
-    deposit.amountInINR = amountInINR; // Store the converted amount
-    deposit.conversionRate = conversionRate;
-    deposit.currencyCode = currencyCode;
-
-    if (remark) {
-      deposit.remark = remark;
-    }
-
-    await deposit.save({ session });
-
-    await session.commitTransaction();
-    session.endSession();
-
-    return res.status(200).json({
-      success: true,
-      message: "Deposit approved successfully",
-      deposit,
-      userBalance: user.balance,
-      amountInINR,
-      conversionRate: conversionRate,
-      currencyCode: currencyCode,
-      referralCommission:
-        referralCommission && referralCommission.length
-          ? referralCommission[0]
-          : null,
-    });
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-
-    console.log(error);
-
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ==========================================
-// Admin Reject Deposit
-// ==========================================
-exports.rejectDeposit = async (req, res) => {
     try {
+        session.startTransaction();
 
         const { id } = req.params;
         const { remark } = req.body;
 
-        const deposit = await Deposit.findById(id);
+        // ==========================================
+        // FIND DEPOSIT
+        // ==========================================
+
+        const deposit =
+            await Deposit.findById(
+                id
+            ).session(session);
+
+        if (!deposit) {
+            await session.abortTransaction();
+            session.endSession();
+
+            return res.status(404).json({
+                success: false,
+                message: "Deposit not found",
+            });
+        }
+
+        // ==========================================
+        // PREVENT DOUBLE APPROVAL
+        // ==========================================
+
+        if (
+            deposit.status !==
+            "pending"
+        ) {
+            await session.abortTransaction();
+            session.endSession();
+
+            return res.status(400).json({
+                success: false,
+                message:
+                    `Deposit already ${deposit.status}`,
+            });
+        }
+
+        // ==========================================
+        // FIND USER
+        // ==========================================
+
+        const user =
+            await User.findById(
+                deposit.user
+            ).session(session);
+
+        if (!user) {
+            await session.abortTransaction();
+            session.endSession();
+
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        // ==========================================
+        // CURRENCY CONVERSION
+        // ==========================================
+
+        let amountInINR =
+            Number(deposit.amount);
+
+        let conversionRate = 1;
+
+        let currencyCode = "INR";
+
+        const countryCode =
+            deposit.country || "IN";
+
+        console.log(
+            "Country Code:",
+            countryCode
+        );
+
+        if (countryCode) {
+            const currencyRate =
+                await CurrencyRate.findOne({
+                    countryCode:
+                        countryCode,
+                    status: true,
+                }).session(session);
+
+            if (currencyRate) {
+                conversionRate =
+                    Number(
+                        currencyRate.rate
+                    );
+
+                currencyCode =
+                    currencyRate.currencyCode;
+
+                amountInINR =
+                    Number(
+                        deposit.amount
+                    ) * conversionRate;
+
+                console.log(
+                    `Rate found: ${conversionRate} for ${countryCode}`
+                );
+            } else {
+                console.log(
+                    `No active rate found for ${countryCode}, using default (1:1)`
+                );
+            }
+        }
+
+        // ==========================================
+        // COUNT PREVIOUS APPROVED DEPOSITS
+        // ==========================================
+
+        const approvedRechargeCount =
+            await Deposit.countDocuments({
+                user: user._id,
+                status: "approved",
+            }).session(session);
+
+        // ==========================================
+        // CREDIT USER BALANCE
+        // ==========================================
+
+        user.balance =
+            Number(
+                user.balance || 0
+            ) + amountInINR;
+
+        await user.save({
+            session,
+        });
+
+        // ==========================================
+        // GET 8 LEVEL CONFIGURATION
+        // ==========================================
+
+        const referralLevels =
+            await ReferralLevel.find({
+                level: {
+                    $gte: 1,
+                    $lte: 8,
+                },
+                status: true,
+            })
+                .sort({
+                    level: 1,
+                })
+                .session(session)
+                .lean();
+
+        // ==========================================
+        // REFERRAL COMMISSION ARRAY
+        // ==========================================
+
+        const referralCommission = [];
+
+        // Direct referrer = Level 1
+        let currentUserId =
+            user.referredByUser ||
+            null;
+
+        // ==========================================
+        // TRAVERSE 8 LEVELS
+        // ==========================================
+
+        for (
+            let level = 1;
+            level <= 8;
+            level++
+        ) {
+            // No more upline
+            if (!currentUserId) {
+                break;
+            }
+
+            // ======================================
+            // FIND UPLINE
+            // ======================================
+
+            const referrer =
+                await User.findById(
+                    currentUserId
+                ).session(session);
+
+            if (!referrer) {
+                break;
+            }
+
+            // ======================================
+            // GET ADMIN LEVEL CONFIG
+            // ======================================
+
+            const levelConfig =
+                referralLevels.find(
+                    (item) =>
+                        item.level ===
+                        level
+                );
+
+            // Level not configured/disabled.
+            // Still continue to next upline.
+            if (!levelConfig) {
+                currentUserId =
+                    referrer.referredByUser ||
+                    null;
+
+                continue;
+            }
+
+            const commissionPercent =
+                Number(
+                    levelConfig.percentage
+                ) || 0;
+
+            // ======================================
+            // BLOCKED USER DOES NOT GET COMMISSION
+            // ======================================
+
+            if (
+                referrer.status !==
+                "active"
+            ) {
+                currentUserId =
+                    referrer.referredByUser ||
+                    null;
+
+                continue;
+            }
+
+            // ======================================
+            // CALCULATE COMMISSION
+            // ======================================
+
+            const commission =
+                Number(
+                    (
+                        (amountInINR *
+                            commissionPercent) /
+                        100
+                    ).toFixed(2)
+                );
+
+            if (commission > 0) {
+                // ==================================
+                // ADD BALANCE
+                // ==================================
+
+                referrer.balance =
+                    Number(
+                        referrer.balance ||
+                            0
+                    ) + commission;
+
+                // ==================================
+                // ADD REFERRAL EARNING
+                // ==================================
+
+                referrer.referralEarning =
+                    Number(
+                        referrer.referralEarning ||
+                            0
+                    ) + commission;
+
+                // ==================================
+                // SAVE REFERRER
+                // ==================================
+
+                await referrer.save({
+                    session,
+                });
+
+                // ==================================
+                // SAVE COMMISSION HISTORY
+                // ==================================
+
+                const commissionRecord =
+                    await ReferralCommission.create(
+                        [
+                            {
+                                referrer:
+                                    referrer._id,
+
+                                referredUser:
+                                    user._id,
+
+                                deposit:
+                                    deposit._id,
+
+                                depositAmount:
+                                    deposit.amount,
+
+                                depositAmountINR:
+                                    amountInINR,
+
+                                currencyCode:
+                                    currencyCode,
+
+                                level:
+                                    level,
+
+                                percentage:
+                                    commissionPercent,
+
+                                commission:
+                                    commission,
+
+                                rechargeNumber:
+                                    approvedRechargeCount +
+                                    1,
+
+                                status:
+                                    "credited",
+                            },
+                        ],
+                        {
+                            session,
+                        }
+                    );
+
+                referralCommission.push(
+                    commissionRecord[0]
+                );
+            }
+
+            // ==================================
+            // MOVE TO NEXT UPLINE
+            // ==================================
+
+            currentUserId =
+                referrer.referredByUser ||
+                null;
+        }
+
+        // ==========================================
+        // UPDATE DEPOSIT
+        // ==========================================
+
+        deposit.status =
+            "approved";
+
+        deposit.approvedBy =
+            req.user.id;
+
+        deposit.approvedAt =
+            new Date();
+
+        deposit.amountInINR =
+            amountInINR;
+
+        deposit.conversionRate =
+            conversionRate;
+
+        deposit.currencyCode =
+            currencyCode;
+
+        if (remark) {
+            deposit.remark =
+                remark;
+        }
+
+        await deposit.save({
+            session,
+        });
+
+        // ==========================================
+        // COMMIT
+        // ==========================================
+
+        await session.commitTransaction();
+
+        session.endSession();
+
+        // ==========================================
+        // TOTAL REFERRAL COMMISSION
+        // ==========================================
+
+        const totalReferralCommission =
+            Number(
+                referralCommission
+                    .reduce(
+                        (
+                            total,
+                            item
+                        ) =>
+                            total +
+                            Number(
+                                item.commission ||
+                                    0
+                            ),
+                        0
+                    )
+                    .toFixed(2)
+            );
+
+        // ==========================================
+        // RESPONSE
+        // ==========================================
+
+        return res.status(200).json({
+            success: true,
+
+            message:
+                "Deposit approved successfully",
+
+            deposit,
+
+            userBalance:
+                user.balance,
+
+            amountInINR,
+
+            conversionRate,
+
+            currencyCode,
+
+            referralLevelsCredited:
+                referralCommission.length,
+
+            totalReferralCommission,
+
+            referralCommission,
+        });
+
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+
+        console.log(
+            "APPROVE DEPOSIT ERROR:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message:
+                error.message,
+        });
+    }
+};
+
+
+// ==========================================
+// Admin Reject Deposit
+// ==========================================
+exports.rejectDeposit = async (
+    req,
+    res
+) => {
+    try {
+        const { id } =
+            req.params;
+
+        const { remark } =
+            req.body;
+
+        const deposit =
+            await Deposit.findById(id);
 
         if (!deposit) {
             return res.status(404).json({
@@ -597,48 +872,56 @@ exports.rejectDeposit = async (req, res) => {
             });
         }
 
-        // Already Processed
-        if (deposit.status !== "pending") {
+        if (
+            deposit.status !==
+            "pending"
+        ) {
             return res.status(400).json({
                 success: false,
-                message: `Deposit already ${deposit.status}`,
+                message:
+                    `Deposit already ${deposit.status}`,
             });
         }
 
-        deposit.status = "rejected";
+        deposit.status =
+            "rejected";
 
-        deposit.rejectedAt = new Date();
+        deposit.rejectedAt =
+            new Date();
 
         if (remark) {
-            deposit.remark = remark;
+            deposit.remark =
+                remark;
         }
 
         await deposit.save();
 
         return res.status(200).json({
             success: true,
-            message: "Deposit rejected successfully",
+            message:
+                "Deposit rejected successfully",
             deposit,
         });
 
     } catch (error) {
-
         console.log(error);
 
         return res.status(500).json({
             success: false,
             message: error.message,
         });
-
     }
 };
+
 
 // ==========================================
 // Admin Deposit Statistics
 // ==========================================
-exports.getDepositStats = async (req, res) => {
+exports.getDepositStats = async (
+    req,
+    res
+) => {
     try {
-
         const [
             totalDeposits,
             pendingDeposits,
@@ -665,7 +948,8 @@ exports.getDepositStats = async (req, res) => {
             Deposit.aggregate([
                 {
                     $match: {
-                        status: "approved",
+                        status:
+                            "approved",
                     },
                 },
                 {
@@ -681,7 +965,8 @@ exports.getDepositStats = async (req, res) => {
             Deposit.aggregate([
                 {
                     $match: {
-                        status: "pending",
+                        status:
+                            "pending",
                     },
                 },
                 {
@@ -693,15 +978,12 @@ exports.getDepositStats = async (req, res) => {
                     },
                 },
             ]),
-
         ]);
 
         return res.status(200).json({
-
             success: true,
 
             stats: {
-
                 totalDeposits,
 
                 pendingDeposits,
@@ -711,28 +993,28 @@ exports.getDepositStats = async (req, res) => {
                 rejectedDeposits,
 
                 approvedAmount:
-                    approvedAmount.length > 0
-                        ? approvedAmount[0].total
+                    approvedAmount.length >
+                    0
+                        ? approvedAmount[0]
+                              .total
                         : 0,
 
                 pendingAmount:
-                    pendingAmount.length > 0
-                        ? pendingAmount[0].total
+                    pendingAmount.length >
+                    0
+                        ? pendingAmount[0]
+                              .total
                         : 0,
-
             },
-
         });
 
     } catch (error) {
-
         console.log(error);
 
         return res.status(500).json({
             success: false,
-            message: error.message,
+            message:
+                error.message,
         });
-
     }
 };
-
