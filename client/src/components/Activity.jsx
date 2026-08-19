@@ -219,7 +219,7 @@ const Activity = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-yellow-50 to-white py-4 px-4 pb-20">
+    <div className="min-h-screen bg-white py-4 px-4 pb-20">
       {/* Header - Mobile Optimized */}
       <div className="text-center mb-4 px-6">
         <div className="flex items-center justify-center gap-1.5">

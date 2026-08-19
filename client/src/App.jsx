@@ -1,15 +1,9 @@
 // src/App.jsx
 
 import { useSelector } from "react-redux";
-import {
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
-import { useLayoutEffect, useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 
 // ========================================
 // Common Components
@@ -29,10 +23,10 @@ import GameCounts from "./Pages/GameCounts.jsx";
 import Homme from "./pages/Homme.jsx";
 import Login from "./Pages/Login.jsx";
 import ProfilePage from "./Pages/ProfilePage.jsx";
+import PromoPage from "./pages/Promo/PromoPage.jsx";
 import Register from "./Pages/Register.jsx";
 import WalletDashboard from "./Pages/WalletDashboard.jsx";
 import Withdrawal from "./Pages/Withdrawal.jsx";
-import PromoPage from "./pages/Promo/PromoPage.jsx";
 
 // ========================================
 // Powerhit Pages
@@ -49,12 +43,12 @@ import Maintenance from "./Pages/Maintenance.jsx";
 // ========================================
 // Matka Pages
 // ========================================
+import PowerballResults from "./components/PowerballResults.jsx";
 import BidsHistory from "./Pages/user/BidsHistory.jsx";
 import MatkaDashboard from "./Pages/user/Dashboard.jsx";
 import MatkaMarkets from "./Pages/user/Markets.jsx";
 import PlaceBid from "./Pages/user/PlaceBid.jsx";
 import MatkaResults from "./Pages/user/Results.jsx";
-
 
 // ========================================
 // Scroll To Top
@@ -71,7 +65,6 @@ function ScrollToTop() {
 
   return null;
 }
-
 
 // ========================================
 // Country Redirect Component
@@ -110,14 +103,11 @@ function CountryPowerhitRedirect() {
   return null;
 }
 
-
 // ========================================
 // App
 // ========================================
 function App() {
-  const { isAuthenticated } = useSelector(
-    (state) => state.auth
-  );
+  const { isAuthenticated } = useSelector((state) => state.auth);
 
   return (
     <>
@@ -125,28 +115,16 @@ function App() {
 
       <AppInitializer>
         <Navbar>
-
           <Routes>
-
             {/* ========================================
                 PUBLIC ROUTES
             ======================================== */}
 
-            <Route
-              path="/"
-              element={<Homme />}
-            />
+            <Route path="/" element={<Homme />} />
 
-            <Route
-              path="/login"
-              element={<Login />}
-            />
+            <Route path="/login" element={<Login />} />
 
-            <Route
-              path="/register"
-              element={<Register />}
-            />
-
+            <Route path="/register" element={<Register />} />
 
             {/* ========================================
                 POWERHIT DEFAULT REDIRECT
@@ -161,7 +139,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
+            <Route
+              path="/powerball/result"
+              element={
+                <ProtectedRoute>
+                  <PowerballResults />
+                </ProtectedRoute>
+              }
+            />
 
             {/* ========================================
                 COUNTRY-WISE POWERHIT
@@ -221,7 +206,6 @@ function App() {
               }
             />
 
-
             {/* ========================================
                 PROMO
             ======================================== */}
@@ -234,7 +218,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
 
             {/* ========================================
                 PROFILE
@@ -249,7 +232,6 @@ function App() {
               }
             />
 
-
             {/* ========================================
                 WALLET
             ======================================== */}
@@ -263,7 +245,6 @@ function App() {
               }
             />
 
-
             {/* ========================================
                 ACTIVITY
             ======================================== */}
@@ -276,7 +257,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
 
             {/* ========================================
                 WITHDRAWAL
@@ -299,7 +279,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
 
             {/* ========================================
                 DEPOSIT
@@ -332,7 +311,6 @@ function App() {
               }
             />
 
-
             {/* ========================================
                 ACCOUNT
             ======================================== */}
@@ -345,7 +323,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
 
             {/* ========================================
                 POWERHIT HISTORY
@@ -405,7 +382,6 @@ function App() {
               }
             />
 
-
             {/* ========================================
                 MATKA DASHBOARD
             ======================================== */}
@@ -418,7 +394,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
 
             {/* ========================================
                 MATKA MARKETS
@@ -433,7 +408,6 @@ function App() {
               }
             />
 
-
             {/* ========================================
                 MATKA PLACE BID
             ======================================== */}
@@ -446,7 +420,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
 
             {/* ========================================
                 MATKA BIDS HISTORY
@@ -461,7 +434,6 @@ function App() {
               }
             />
 
-
             {/* ========================================
                 MATKA RESULTS
             ======================================== */}
@@ -475,23 +447,16 @@ function App() {
               }
             />
 
-
             {/* ========================================
                 404 / MAINTENANCE
             ======================================== */}
 
-            <Route
-              path="*"
-              element={<Maintenance />}
-            />
-
+            <Route path="*" element={<Maintenance />} />
           </Routes>
-
         </Navbar>
       </AppInitializer>
     </>
   );
 }
-
 
 export default App;
