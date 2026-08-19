@@ -1,132 +1,279 @@
 import {
+  ArrowLeft,
   ArrowLeftFromLine,
-  ArrowRight,
   ArrowRightFromLine,
+  BarChart3,
+  Calendar,
+  Check,
+  ChevronRight,
   Clock,
-  Compass,
+  Coins,
   Crown,
   Dice5,
-  Filter,
-  Gamepad2,
   Gem,
-  Hash,
-  Inbox,
+  Grid3x3,
+  History,
+  Info,
+  Landmark,
   Moon,
-  Search,
   Sparkles,
-  Star,
   Sun,
-  Target,
   Timer,
-  TrendingUp,
-  Zap,
+  Trophy,
+  User,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { getActiveMarkets } from "../../redux/slices/marketSlice";
+
+/* ============================================================
+   MOCK-DATA HELPERS
+   Everything below is ONLY used for fields the API does not
+   (yet) return: status (live/open/upcoming), market avatar,
+   today's result, last result, game types, coins balance and
+   recent results. The moment your backend sends these, delete
+   the matching mock fn and wire the real field in its place.
+   Every place mock data is shown carries a tiny "mock" tag.
+   ============================================================ */
+
+const MOCK_AVATARS = [Crown, Landmark, Gem, Sparkles];
+
+// deterministic "random" digit so the same market always shows
+// the same mock number during a session (not real API data)
+const seededDigit = (seed) => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return hash % 10;
+};
+
+const mockTriplet = (marketId, salt = "") =>
+  [0, 1, 2].map((i) => seededDigit(`${marketId}-${salt}-${i}`));
+
+const toMinutes = (t) => {
+  if (!t) return 0;
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + (m || 0);
+};
+
+const formatTime12 = (t) => {
+  if (!t) return "--:--";
+  const [h, m] = t.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  let hour12 = h % 12;
+  if (hour12 === 0) hour12 = 12;
+  return `${String(hour12).padStart(2, "0")}:${String(m).padStart(
+    2,
+    "0",
+  )} ${period}`;
+};
+
+// Derived (not random-mock, but not from API either) — computed from
+// real openTime/closeTime vs current time. Handles overnight windows
+// like "11:34" -> "01:35".
+const getMarketStatus = (openTime, closeTime) => {
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const openMin = toMinutes(openTime);
+  const closeMin = toMinutes(closeTime);
+
+  if (closeMin < openMin) {
+    // window crosses midnight
+    if (nowMin >= openMin || nowMin <= closeMin) return "live";
+    return "upcoming";
+  }
+  if (nowMin < openMin) return "upcoming";
+  if (nowMin <= closeMin) return "live";
+  return "closed";
+};
+
+// Golden-only status styling — no blue/red/green, just shade of amber
+// (closed uses neutral gray since it's an inactive/disabled state, not an accent color)
+const STATUS_STYLES = {
+  live: {
+    dot: "bg-amber-500",
+    text: "text-amber-700",
+    bg: "bg-amber-50 border-amber-200",
+    label: "LIVE",
+  },
+  upcoming: {
+    dot: "bg-amber-300",
+    text: "text-amber-600",
+    bg: "bg-amber-50/60 border-amber-100",
+    label: "UPCOMING",
+  },
+  closed: {
+    dot: "bg-gray-300",
+    text: "text-gray-400",
+    bg: "bg-gray-50 border-gray-100",
+    label: "CLOSED",
+  },
+};
+
+// Every game type rendered as the SAME card style (digit-circle or icon
+// badge + label + sub-text + PLAY button). First 4 show by default; "VIEW
+// ALL" reveals the rest as more cards in the same grid — no separate list UI.
+// Swap this out for market.gameTypes the moment the backend fills it in.
+const GAME_TYPES = [
+  {
+    key: "single",
+    label: "SINGLE",
+    sub: "Choose One Number",
+    mode: "digits",
+    digits: ["7"],
+  },
+  {
+    key: "jodi",
+    label: "JODI",
+    sub: "Choose Two Numbers",
+    mode: "digits",
+    digits: ["7", "8"],
+  },
+  {
+    key: "panna",
+    label: "PANNA",
+    sub: "Choose Panna",
+    mode: "icon",
+    icon: Dice5,
+  },
+  {
+    key: "spot",
+    label: "SPOT",
+    sub: "Choose Spot Number",
+    mode: "digits",
+    digits: ["5"],
+  },
+  {
+    key: "half-sangam",
+    label: "HALF-SANGAM",
+    sub: "Open + Close Combo",
+    mode: "icon",
+    icon: Moon,
+  },
+  {
+    key: "full-sangam",
+    label: "FULL-SANGAM",
+    sub: "Full Combo",
+    mode: "icon",
+    icon: Sun,
+  },
+  {
+    key: "last-digit",
+    label: "LAST DIGIT",
+    sub: "Choose Last Digit",
+    mode: "icon",
+    icon: ArrowRightFromLine,
+  },
+  {
+    key: "first-digit",
+    label: "FIRST DIGIT",
+    sub: "Choose First Digit",
+    mode: "icon",
+    icon: ArrowLeftFromLine,
+  },
+];
+
+const DEFAULT_VISIBLE_GAME_TYPES = 6;
+
+// Small inline tag so it's always obvious which pixels are placeholder.
+const MockTag = () => (
+  <span className="ml-1.5 inline-flex items-center rounded-full border border-dashed border-amber-300 bg-amber-50 px-1.5 py-[1px] text-[9px] font-semibold uppercase tracking-wide text-amber-500">
+    mock
+  </span>
+);
 
 const MatkaMarkets = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { activeMarkets, loading } = useSelector((state) => state.market);
-  const [search, setSearch] = useState("");
-  const [filterGameType, setFilterGameType] = useState("");
+
+  const [activeTab, setActiveTab] = useState("live"); // live | open | upcoming
+  const [selectedMarketId, setSelectedMarketId] = useState(null);
+  const [justOpened, setJustOpened] = useState(false);
+  const [showAllGameTypes, setShowAllGameTypes] = useState(false);
+  const [selectedGameType, setSelectedGameType] = useState(null);
+  const detailRef = useRef(null);
+  const openedTimeoutRef = useRef(null);
 
   useEffect(() => {
     dispatch(getActiveMarkets());
   }, [dispatch]);
 
-  const gameTypes = [
-    "single",
-    "jodi",
-    "panna",
-    "half-sangam",
-    "full-sangam",
-    "last-digit",
-    "first-digit",
-  ];
+  // pick a default selected market once markets load
+  useEffect(() => {
+    if (activeMarkets?.length && !selectedMarketId) {
+      setSelectedMarketId(activeMarkets[0]._id);
+    }
+  }, [activeMarkets, selectedMarketId]);
 
-  const getGameTypeDisplay = (type) => {
-    const display = {
-      single: "Single",
-      jodi: "Jodi",
-      panna: "Panna",
-      "half-sangam": "Half-Sangam",
-      "full-sangam": "Full-Sangam",
-      "last-digit": "Last Digit",
-      "first-digit": "First Digit",
-    };
-    return display[type] || type;
+  // cleanup the "just opened" flash timer on unmount
+  useEffect(() => {
+    return () => clearTimeout(openedTimeoutRef.current);
+  }, []);
+
+  const marketsWithStatus = useMemo(
+    () =>
+      (activeMarkets || []).map((m) => ({
+        ...m,
+        status: getMarketStatus(m.openTime, m.closeTime),
+      })),
+    [activeMarkets],
+  );
+
+  const filteredMarkets = useMemo(() => {
+    if (activeTab === "live")
+      return marketsWithStatus.filter((m) => m.status === "live");
+    if (activeTab === "upcoming")
+      return marketsWithStatus.filter((m) => m.status === "upcoming");
+    // "open" = anything still playable (live or upcoming) — API has no explicit
+    // "open" flag today, adjust this mapping once it does.
+    return marketsWithStatus.filter((m) => m.status !== "closed");
+  }, [marketsWithStatus, activeTab]);
+
+  const selectedMarket = marketsWithStatus.find(
+    (m) => m._id === selectedMarketId,
+  );
+
+  // Clicking "PLAY NOW" / "VIEW" (or the card) on ANY market — Jaipur, Delhi,
+  // Kalyan, whatever — makes it the active market, scrolls its detail panel
+  // into view, AND flashes a gold ring around it for a second so it's
+  // unmistakable that the market actually opened, even if it was already
+  // the selected one.
+  const openMarket = (marketId) => {
+    setSelectedMarketId(marketId);
+    setJustOpened(true);
+
+    // wait a tick so the panel has re-rendered with the new market before scrolling
+    requestAnimationFrame(() => {
+      detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    clearTimeout(openedTimeoutRef.current);
+    openedTimeoutRef.current = setTimeout(() => setJustOpened(false), 1200);
   };
-
-  const getGameTypeGradient = (type) => {
-    const gradients = {
-      single: "from-blue-400 to-indigo-500",
-      jodi: "from-green-400 to-emerald-500",
-      panna: "from-purple-400 to-violet-500",
-      "half-sangam": "from-orange-400 to-amber-500",
-      "full-sangam": "from-red-400 to-rose-500",
-      "last-digit": "from-cyan-400 to-blue-500",
-      "first-digit": "from-pink-400 to-rose-500",
-    };
-    return gradients[type] || "from-gray-400 to-gray-500";
-  };
-
-  const getGameTypeIcon = (type) => {
-    const icons = {
-      single: Target,
-      jodi: Hash,
-      panna: Dice5,
-      "half-sangam": Moon,
-      "full-sangam": Sun,
-      "last-digit": ArrowRightFromLine,
-      "first-digit": ArrowLeftFromLine,
-    };
-    return icons[type] || Gamepad2;
-  };
-
-  const getMarketBadge = (marketName) => {
-    const badges = {
-      Kalyan: { color: "from-amber-400 to-orange-500", icon: Crown },
-      Main: { color: "from-emerald-400 to-teal-500", icon: Star },
-      Rajdhani: { color: "from-purple-400 to-pink-500", icon: Gem },
-      Time: { color: "from-cyan-400 to-blue-500", icon: Compass },
-    };
-    const found = Object.keys(badges).find((key) => marketName?.includes(key));
-    return found
-      ? badges[found]
-      : { color: "from-gray-400 to-gray-500", icon: Sparkles };
-  };
-
-  const filteredMarkets = activeMarkets?.filter((market) => {
-    const matchSearch =
-      market.name.toLowerCase().includes(search.toLowerCase()) ||
-      market.marketId.toLowerCase().includes(search.toLowerCase());
-    const matchGameType = filterGameType
-      ? market.gameType === filterGameType
-      : true;
-    return matchSearch && matchGameType;
-  });
 
   const handlePlaceBid = (marketId, gameType) => {
     navigate(`/matka/place-bid/${marketId}`, {
-      state: {
-        gameType: gameType,
-        marketId: marketId,
-      },
+      state: { gameType, marketId },
     });
+  };
+
+  const handleSelectGameType = (gameType) => {
+    setSelectedGameType(gameType);
+    setShowAllGameTypes(false);
+    if (selectedMarket) {
+      handlePlaceBid(selectedMarket._id, gameType);
+    }
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[60vh]">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <div className="relative">
-          <div className="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-amber-500"></div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-10 w-10 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 animate-pulse"></div>
-          </div>
-          <p className="text-gray-500 text-sm mt-4 text-center font-medium">
+          <div className="h-16 w-16 animate-spin rounded-full border-t-4 border-b-4 border-amber-500"></div>
+          <p className="mt-4 text-center text-sm font-medium text-gray-500">
             Loading markets...
           </p>
         </div>
@@ -135,241 +282,479 @@ const MatkaMarkets = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-amber-50/30 px-4 sm:px-6 py-6">
-      <div className=" mx-auto space-y-6">
-        {/* Header with 3D Effect */}
-        <div className="group relative">
-          <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-400 rounded-2xl blur-xl opacity-30 group-hover:opacity-50 transition duration-500"></div>
-          <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/50 p-6 transform group-hover:scale-[1.01] transition duration-300">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 to-yellow-400 rounded-full blur-md"></div>
-                  <div className="relative bg-gradient-to-br from-amber-400 to-orange-500 p-3 rounded-full shadow-lg">
-                    <Compass size={28} className="text-white" />
-                  </div>
-                </div>
-                <div>
-                  <h1 className="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
-                    Active Markets
-                  </h1>
-                  <p className="text-gray-500 text-sm flex items-center gap-1">
-                    <Sparkles size={14} className="text-amber-400" />
-                    {filteredMarkets?.length || 0} markets available
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                <div className="relative group/input">
-                  <Search
-                    size={18}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-hover/input:text-amber-500 transition"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search markets..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent w-full sm:w-48 bg-white/50 backdrop-blur-sm transition duration-200 hover:border-amber-300"
-                  />
-                </div>
-                <div className="relative group/select">
-                  <Filter
-                    size={18}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-hover/select:text-amber-500 transition"
-                  />
-                  <select
-                    value={filterGameType}
-                    onChange={(e) => setFilterGameType(e.target.value)}
-                    className="pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent appearance-none w-full sm:w-48 bg-white/50 backdrop-blur-sm transition duration-200 hover:border-amber-300"
-                  >
-                    <option value="">All Types</option>
-                    {gameTypes.map((type) => {
-                      const Icon = getGameTypeIcon(type);
-                      return (
-                        <option key={type} value={type}>
-                          {getGameTypeDisplay(type)}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              </div>
-            </div>
+    <div className="scrollbar-hide relative h-screen overflow-y-auto bg-white pb-10">
+      {/* Hides the scrollbar on every element with the scrollbar-hide class
+          (this container's vertical scroll + both horizontal carousels below)
+          while keeping them fully scrollable via touch/drag/wheel. */}
+      <style>{`
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
+
+      <div className="mx-auto max-w-6xl space-y-5 px-4 pt-4 sm:px-6">
+        {/* ===== Header ===== */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-200 text-amber-600 shadow-sm active:scale-95"
+          >
+            <ArrowLeft size={18} />
+          </button>
+
+          <div className="text-center">
+            <h1 className="flex items-center justify-center gap-2 text-xl font-extrabold tracking-tight text-amber-700 sm:text-2xl">
+              <Crown size={20} className="text-amber-400" />
+              MATKA PLAY
+              <Crown size={20} className="text-amber-400" />
+            </h1>
+            <p className="text-[10px] font-semibold tracking-[0.25em] text-amber-400">
+              PLAY • WIN • REPEAT
+            </p>
           </div>
         </div>
 
-        {/* Markets Grid */}
-        {filteredMarkets?.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {filteredMarkets.map((market) => {
-              const gameTypeDisplay = getGameTypeDisplay(market.gameType);
-              const gameTypeGradient = getGameTypeGradient(market.gameType);
-              const GameTypeIcon = getGameTypeIcon(market.gameType);
-              const badge = getMarketBadge(market.name);
-              const BadgeIcon = badge.icon;
+        {/* ===== Choose Market ===== */}
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="h-4 w-1 rounded-full bg-amber-500" />
+              <h2 className="text-sm font-extrabold uppercase tracking-wide text-gray-800">
+                Choose Market
+              </h2>
+            </div>
 
-              return (
-                <div
-                  key={market._id}
-                  className="group/card relative transform hover:-translate-y-2 transition-all duration-500"
-                >
+            <div className="flex overflow-hidden rounded-full border border-amber-100 bg-amber-50/40 p-1 text-xs font-bold">
+              {["live", "open", "upcoming"].map((tab) => {
+                const style = STATUS_STYLES[tab === "open" ? "live" : tab];
+                const isActive = activeTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 transition ${
+                      isActive
+                        ? "bg-white text-amber-700 shadow border border-amber-300"
+                        : "text-gray-400"
+                    }`}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+                    {tab.toUpperCase()}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {filteredMarkets.length > 0 ? (
+            <div className="scrollbar-hide flex gap-4 overflow-x-auto pb-2">
+              {filteredMarkets.map((market, idx) => {
+                const Avatar = MOCK_AVATARS[idx % MOCK_AVATARS.length];
+                const style = STATUS_STYLES[market.status];
+                const isSelected = market._id === selectedMarketId;
+
+                return (
                   <div
-                    className={`absolute -inset-1 bg-gradient-to-r ${badge.color} rounded-2xl blur-xl opacity-20 group-hover/card:opacity-40 transition duration-500`}
-                  ></div>
-                  <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/50 p-5 overflow-hidden transition-all duration-300 hover:border-amber-200">
-                    {/* Decorative Gradient */}
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-amber-400/10 to-orange-400/10 rounded-full -mr-16 -mt-16"></div>
+                    key={market._id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openMarket(market._id)}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && openMarket(market._id)
+                    }
+                    className={`w-40 flex-shrink-0 cursor-pointer rounded-2xl border bg-white p-3 text-left shadow-sm transition ${
+                      isSelected
+                        ? "border-amber-400 ring-2 ring-amber-200"
+                        : "border-gray-100"
+                    }`}
+                  >
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${style.bg} ${style.text}`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${style.dot}`}
+                      />
+                      {style.label}
+                    </span>
 
-                    {/* Header */}
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-extrabold text-gray-800 group-hover/card:text-amber-600 transition">
-                            {market.name}
-                          </h3>
-                          <div
-                            className={`inline-block p-1 rounded-lg bg-gradient-to-r ${badge.color} shadow-lg`}
-                          >
-                            <BadgeIcon size={10} className="text-white" />
-                          </div>
-                        </div>
-                        <p className="text-xs text-gray-400 font-mono">
-                          ID: {market.marketId}
-                        </p>
-                      </div>
-                      <span className="inline-flex items-center gap-1.5 bg-green-100/80 backdrop-blur-sm text-green-700 text-xs font-bold px-3 py-1.5 rounded-full border border-green-200 shadow-lg shadow-green-500/10">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                        Active
+                    <div className="relative mx-auto my-2 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-amber-100 to-amber-200 ring-2 ring-amber-300">
+                      <Avatar size={26} className="text-amber-600" />
+                      <span className="absolute -bottom-1 -right-1 rounded-full border border-amber-300 bg-white px-1 text-[7px] font-bold text-amber-500">
+                        mock
                       </span>
                     </div>
 
-                    {/* Game Details */}
-                    <div className="space-y-2.5 text-sm">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-500 font-medium">
-                          Game Type
-                        </span>
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full bg-gradient-to-r ${gameTypeGradient} text-white shadow-lg transform group-hover/card:scale-105 transition duration-300`}
-                        >
-                          <GameTypeIcon size={14} />
-                          {gameTypeDisplay}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center bg-gray-50/50 backdrop-blur-sm px-3 py-2 rounded-xl">
-                        <span className="text-gray-500 flex items-center gap-1.5">
-                          <Clock size={14} className="text-amber-400" /> Open
-                        </span>
-                        <span className="font-bold text-gray-700">
-                          {market.openTime}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center bg-gray-50/50 backdrop-blur-sm px-3 py-2 rounded-xl">
-                        <span className="text-gray-500 flex items-center gap-1.5">
-                          <Timer size={14} className="text-red-400" /> Close
-                        </span>
-                        <span className="font-bold text-gray-700">
-                          {market.closeTime}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center bg-gradient-to-r from-amber-50/50 to-orange-50/50 backdrop-blur-sm px-3 py-2 rounded-xl border border-amber-200/50">
-                        <span className="text-gray-500 flex items-center gap-1.5">
-                          <TrendingUp size={14} className="text-amber-500" />{" "}
-                          Range
-                        </span>
-                        <span className="font-extrabold text-transparent bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text">
-                          ₹{market.minBid} - ₹{market.maxBid}
-                        </span>
-                      </div>
-                      {market.resultTime && (
-                        <div className="flex justify-between items-center bg-purple-50/50 backdrop-blur-sm px-3 py-2 rounded-xl border border-purple-200/50">
-                          <span className="text-gray-500 flex items-center gap-1.5">
-                            <Clock size={14} className="text-purple-400" />{" "}
-                            Result
-                          </span>
-                          <span className="font-bold text-purple-700">
-                            {market.resultTime}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <p className="text-center text-sm font-extrabold text-amber-800">
+                      {market.name}
+                    </p>
+                    <p className="text-center text-[11px] text-gray-500">
+                      Open&nbsp;
+                      <span className="font-semibold text-gray-700">
+                        {formatTime12(market.openTime)}
+                      </span>
+                    </p>
+                    <p className="text-center text-[11px] text-gray-500">
+                      Close&nbsp;
+                      <span className="font-semibold text-gray-700">
+                        {formatTime12(market.closeTime)}
+                      </span>
+                    </p>
 
-                    {/* Place Bid Button */}
                     <button
-                      onClick={() =>
-                        handlePlaceBid(market._id, market.gameType)
-                      }
-                      className="relative group/btn w-full mt-4 overflow-hidden rounded-xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openMarket(market._id);
+                      }}
+                      className={`mt-2 w-full rounded-lg py-1.5 text-center text-xs font-bold text-white shadow ${
+                        market.status === "live"
+                          ? "bg-gradient-to-r from-amber-500 to-yellow-500"
+                          : "bg-gradient-to-r from-amber-300 to-yellow-300"
+                      }`}
                     >
-                      <div
-                        className={`absolute -inset-1 bg-gradient-to-r ${badge.color} rounded-xl blur opacity-30 group-hover/btn:opacity-50 transition duration-500`}
-                      ></div>
-                      <div
-                        className={`relative bg-gradient-to-r ${badge.color} py-3 rounded-xl flex items-center justify-center gap-2 text-white font-bold shadow-lg shadow-amber-500/30`}
-                      >
-                        <Zap size={16} />
-                        Place Bid
-                        <ArrowRight
-                          size={16}
-                          className="group-hover/btn:translate-x-1 transition duration-300"
-                        />
-                      </div>
+                      {market.status === "live" ? "PLAY NOW →" : "VIEW →"}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openMarket(market._id);
+                      }}
+                      className="mt-1 w-full text-center text-[11px] font-semibold text-amber-700"
+                    >
+                      RESULTS →
                     </button>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="group relative">
-            <div className="absolute -inset-1 bg-gradient-to-r from-amber-400/20 to-orange-400/20 rounded-2xl blur-xl"></div>
-            <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/50 p-16 text-center">
-              <div className="flex justify-center mb-4">
-                <div className="w-28 h-28 rounded-full bg-gradient-to-r from-amber-100 to-orange-100 flex items-center justify-center animate-float">
-                  <Inbox
-                    size={56}
-                    className="text-amber-500"
-                    strokeWidth={1.5}
-                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/40 py-10 text-center text-sm text-gray-400">
+              No markets in this tab right now
+            </div>
+          )}
+        </div>
+
+        {/* ===== Selected Market Detail ===== */}
+        {selectedMarket && (
+          <div
+            ref={detailRef}
+            className={`relative overflow-hidden rounded-2xl border bg-gradient-to-br from-amber-50 via-white to-white p-3 shadow-lg scroll-mt-4 transition-all duration-300 sm:rounded-3xl sm:p-5 ${
+              justOpened
+                ? "border-amber-400 ring-4 ring-amber-300"
+                : "border-amber-200"
+            }`}
+          >
+            {/* "Market opened" confirmation pill — fades out after the flash */}
+            <div
+              className={`pointer-events-none absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-amber-500 px-3 py-1 text-[10px] font-bold text-white shadow transition-opacity duration-500 ${
+                justOpened ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              {selectedMarket.name} opened
+            </div>
+
+            {/* Decorative Sparkles */}
+            <Sparkles className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 text-amber-200/30 sm:h-32 sm:w-32" />
+
+            {/* Header Section */}
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-4">
+              <div className="flex items-center gap-2">
+                <Crown size={18} className="text-amber-500 sm:h-6 sm:w-6" />
+                <div>
+                  <h3 className="text-base font-extrabold text-amber-800 sm:text-2xl">
+                    {selectedMarket.name}
+                  </h3>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[8px] font-bold sm:px-2.5 sm:py-0.5 sm:text-[10px] ${
+                      selectedMarket.status === "live"
+                        ? "border-amber-300 bg-amber-100 text-amber-700"
+                        : "border-amber-100 bg-amber-50 text-amber-500"
+                    }`}
+                  >
+                    <span
+                      className={`h-1 w-1 rounded-full sm:h-1.5 sm:w-1.5 ${
+                        selectedMarket.status === "live"
+                          ? "bg-amber-500"
+                          : "bg-amber-300"
+                      }`}
+                    />
+                    {selectedMarket.status.toUpperCase()}
+                  </span>
                 </div>
               </div>
-              <p className="text-gray-600 text-xl font-semibold">
-                No active markets available
-              </p>
-              <p className="text-gray-400 text-sm mt-2">
-                Check back later for new markets
-              </p>
+
+              <div className="flex items-center gap-2">
+                <button className="hidden items-center gap-1 rounded-full border border-amber-300 px-2.5 py-1 text-[9px] font-semibold text-amber-700 sm:flex sm:px-3 sm:text-[11px]">
+                  <Info size={12} /> MARKET INFO
+                </button>
+                <div className="flex items-center gap-1 rounded-full border border-amber-200 bg-white px-2 py-0.5 sm:px-3 sm:py-1">
+                  <Coins
+                    size={12}
+                    className="text-amber-400 sm:h-[14px] sm:w-[14px]"
+                  />
+                  <span className="text-[10px] font-bold text-gray-800 sm:text-xs">
+                    12,500
+                  </span>
+                  <MockTag />
+                </div>
+              </div>
+            </div>
+
+            {/* Main Grid - Side by Side Always */}
+            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+              {/* Today's Result Card - Left Side */}
+              <div className="rounded-xl border border-amber-100 bg-white p-2 sm:rounded-2xl sm:p-4">
+                <div className="mb-1.5 flex items-center justify-center sm:mb-3">
+                  <span className="flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-300 to-yellow-400 px-2 py-0.5 text-[8px] font-extrabold text-amber-900 sm:px-3 sm:py-1 sm:text-[11px]">
+                    TODAY'S RESULT
+                    <MockTag />
+                  </span>
+                </div>
+
+                <div className="flex justify-center gap-1.5 sm:gap-3">
+                  {mockTriplet(selectedMarket.marketId, "today").map((d, i) => (
+                    <div
+                      key={i}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border-2 border-amber-200 bg-amber-50 text-lg font-extrabold text-amber-800 shadow-sm sm:h-14 sm:w-14 sm:rounded-xl sm:text-2xl"
+                    >
+                      {d}
+                    </div>
+                  ))}
+                </div>
+
+                <p className="mt-1.5 flex items-center justify-center gap-1 text-[8px] text-gray-400 sm:mt-3 sm:text-[11px]">
+                  <span className="h-1 w-1 animate-pulse rounded-full bg-amber-400" />
+                  Updated now
+                </p>
+              </div>
+
+              {/* Market Timing + Last Result Card - Right Side */}
+              <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-2 sm:rounded-2xl sm:p-4">
+                <p className="mb-1 flex items-center gap-1 text-[9px] font-bold text-amber-700 sm:mb-2 sm:text-xs">
+                  <Clock size={10} className="sm:h-[13px] sm:w-[13px]" /> TIMING
+                </p>
+
+                <div className="flex justify-between text-center">
+                  <div>
+                    <p className="text-[7px] text-amber-500 sm:text-[10px]">
+                      Open
+                    </p>
+                    <p className="text-[10px] font-extrabold text-gray-800 sm:text-sm">
+                      {formatTime12(selectedMarket.openTime)}
+                    </p>
+                  </div>
+                  <div className="w-px bg-amber-200" />
+                  <div>
+                    <p className="text-[7px] text-amber-500 sm:text-[10px]">
+                      Close
+                    </p>
+                    <p className="text-[10px] font-extrabold text-gray-800 sm:text-sm">
+                      {formatTime12(selectedMarket.closeTime)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="my-1.5 h-px bg-amber-200 sm:my-3" />
+
+                <p className="mb-1 flex items-center gap-1 text-[9px] font-bold text-amber-700 sm:mb-2 sm:text-xs">
+                  <Timer size={10} className="sm:h-[13px] sm:w-[13px]" /> LAST
+                  <span className="text-[7px] font-normal text-amber-400 sm:text-[10px]">
+                    (
+                    {new Date(Date.now() - 86400000)
+                      .toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                      })
+                      .toUpperCase()}
+                    )
+                  </span>
+                  <MockTag />
+                </p>
+
+                <div className="flex justify-center gap-1.5 sm:gap-2.5">
+                  {mockTriplet(selectedMarket.marketId, "last").map((d, i) => (
+                    <div
+                      key={i}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-200 bg-white text-sm font-extrabold text-amber-800 sm:h-10 sm:w-10 sm:rounded-xl sm:text-lg"
+                    >
+                      {d}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Footer Note */}
-        <div className="text-center text-xs text-gray-400 pt-4">
-          <span className="inline-flex items-center gap-1">
-            <Gem size={12} className="text-amber-400" />
-            Premium Markets • Place your bids now
-          </span>
+        {/* ===== Choose Game Type ===== */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Grid3x3 size={16} className="text-amber-600" />
+              <h2 className="text-sm font-extrabold uppercase tracking-wide text-gray-800">
+                Choose Game Type
+              </h2>
+              <MockTag />
+            </div>
+            <button
+              onClick={() => setShowAllGameTypes((prev) => !prev)}
+              className="flex items-center gap-0.5 text-xs font-bold text-amber-700"
+            >
+              VIEW ALL
+              <ChevronRight
+                size={14}
+                className={`transition-transform duration-200 ${
+                  showAllGameTypes ? "rotate-90" : ""
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1 sm:gap-2">
+            {GAME_TYPES.slice(
+              0,
+              showAllGameTypes ? GAME_TYPES.length : DEFAULT_VISIBLE_GAME_TYPES,
+            ).map((gt) => {
+              const Icon = gt.icon;
+              const isSelected = selectedGameType === gt.key;
+
+              return (
+                <div
+                  key={gt.key}
+                  className={`rounded-2xl border bg-white p-2 sm:p-4 text-center shadow-sm transition flex flex-col items-center justify-between min-h-[160px] sm:min-h-[200px] ${
+                    isSelected
+                      ? "border-amber-400 ring-2 ring-amber-200"
+                      : "border-amber-100"
+                  }`}
+                >
+                  {/* 1. Game Label - Fixed Position (Top) */}
+                  <p className="mb-1.5 sm:mb-2 flex items-center justify-center gap-1 text-[10px] sm:text-xs font-extrabold tracking-wide text-amber-800 min-h-[20px] sm:min-h-[24px]">
+                    {gt.label}
+                    {isSelected && (
+                      <Check
+                        size={12}
+                        className="text-amber-600 flex-shrink-0"
+                      />
+                    )}
+                  </p>
+
+                  {/* 2. Icon/Digits - Fixed Position (Middle) */}
+                  <div className="mx-auto mb-1.5 sm:mb-2 flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center flex-shrink-0">
+                    {gt.mode === "digits" ? (
+                      <div className="flex h-12 sm:h-14 items-center justify-center gap-1">
+                        {gt.digits.map((d, i) => (
+                          <span
+                            key={i}
+                            className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 text-sm sm:text-base font-extrabold text-white ring-2 ring-amber-200"
+                          >
+                            {d}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 text-white ring-2 ring-amber-200">
+                        <Icon size={20} className="sm:h-6 sm:w-6" />
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 3. Subtitle - Fixed Position (Bottom-Middle) */}
+                  <p className="mb-1.5 sm:mb-3 text-[8px] sm:text-[11px] text-gray-400 min-h-[16px] sm:min-h-[20px] line-clamp-1">
+                    {gt.sub}
+                  </p>
+
+                  {/* 4. Play Button - Fixed Position (Bottom) */}
+                  <button
+                    onClick={() =>
+                      selectedMarket && handleSelectGameType(gt.key)
+                    }
+                    className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-white shadow hover:shadow-md transition-all flex-shrink-0"
+                    disabled={!selectedMarket}
+                  >
+                    {selectedMarket ? "PLAY →" : "SELECT MARKET"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ===== Quick Access ===== */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-amber-500" />
+            <h2 className="text-sm font-extrabold uppercase tracking-wide text-gray-800">
+              Quick Access
+            </h2>
+          </div>
+          <div className="grid grid-cols-4 gap-3 sm:grid-cols-4">
+            {[
+              { label: "Today's Result", icon: Trophy },
+              { label: "Previous Results", icon: History },
+              { label: "Detailed Chart", icon: BarChart3 },
+              { label: "My Plays", icon: User },
+            ].map((item) => (
+              <button
+                key={item.label}
+                className="flex items-center justify-center gap-1 rounded-xl border border-amber-100 bg-white py-2 text-[9px] font-medium text-gray-700 shadow-sm"
+              >
+                <item.icon size={10} className="text-amber-500" />
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ===== Recent Results ===== */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Calendar size={16} className="text-amber-600" />
+              <h2 className="text-sm font-extrabold uppercase tracking-wide text-gray-800">
+                Recent Results
+              </h2>
+              <MockTag />
+            </div>
+            <button className="flex items-center gap-0.5 text-xs font-bold text-amber-700">
+              VIEW ALL <ChevronRight size={14} />
+            </button>
+          </div>
+
+          <div className="scrollbar-hide flex gap-3 overflow-x-auto pb-2">
+            {marketsWithStatus.map((market) => (
+              <div
+                key={market._id}
+                className="w-32 flex-shrink-0 rounded-xl border border-amber-100 bg-white p-3 text-center shadow-sm"
+              >
+                <p className="text-[10px] font-semibold text-gray-400">
+                  {new Date()
+                    .toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                    })
+                    .toUpperCase()}
+                </p>
+                <p className="mb-2 truncate text-[11px] font-extrabold text-amber-800">
+                  {market.name.toUpperCase()}
+                </p>
+                <div className="flex justify-center gap-1">
+                  {mockTriplet(market.marketId, "recent").map((d, i) => (
+                    <span
+                      key={i}
+                      className="flex h-6 w-6 items-center justify-center rounded bg-amber-50 text-xs font-bold text-amber-800"
+                    >
+                      {d}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes float {
-          0%,
-          100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-10px);
-          }
-        }
-        .animate-float {
-          animation: float 3s ease-in-out infinite;
-        }
-        .animate-pulse {
-          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-      `}</style>
     </div>
   );
 };

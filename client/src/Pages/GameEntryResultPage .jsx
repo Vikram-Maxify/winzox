@@ -631,7 +631,9 @@ const GameEntryResultPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const { entries, loading, error } = useSelector((state) => state.gameEntry);
+  const { entries, loading, error } = useSelector(
+    (state) => state.indiaGameEntry,
+  );
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteId, setDeleteId] = useState(null);

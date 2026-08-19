@@ -1,10 +1,9 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { api } from './api';
-
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import { api } from "./api";
 
 // Place a bid
 export const placeBid = createAsyncThunk(
-  'bid/place',
+  "bid/place",
   async (bidData, { getState, rejectWithValue }) => {
     try {
       const { auth } = getState();
@@ -13,14 +12,16 @@ export const placeBid = createAsyncThunk(
       });
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data);
+      return rejectWithValue(
+        error.response?.data || { message: "Failed to place bid" },
+      );
     }
-  }
+  },
 );
 
 // Get user's bidding history
 export const getBiddingHistory = createAsyncThunk(
-  'bid/getHistory',
+  "bid/getHistory",
   async (params, { getState, rejectWithValue }) => {
     try {
       const { auth } = getState();
@@ -30,14 +31,16 @@ export const getBiddingHistory = createAsyncThunk(
       });
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data);
+      return rejectWithValue(
+        error.response?.data || { message: "Failed to get bidding history" },
+      );
     }
-  }
+  },
 );
 
 // Get today's bids summary
 export const getTodayBidsSummary = createAsyncThunk(
-  'bid/getTodaySummary',
+  "bid/getTodaySummary",
   async (_, { getState, rejectWithValue }) => {
     try {
       const { auth } = getState();
@@ -46,14 +49,16 @@ export const getTodayBidsSummary = createAsyncThunk(
       });
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data);
+      return rejectWithValue(
+        error.response?.data || { message: "Failed to get today summary" },
+      );
     }
-  }
+  },
 );
 
 // Cancel bid
 export const cancelBid = createAsyncThunk(
-  'bid/cancel',
+  "bid/cancel",
   async (bidId, { getState, rejectWithValue }) => {
     try {
       const { auth } = getState();
@@ -62,14 +67,16 @@ export const cancelBid = createAsyncThunk(
       });
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data);
+      return rejectWithValue(
+        error.response?.data || { message: "Failed to cancel bid" },
+      );
     }
-  }
+  },
 );
 
 // Get bid by ID
 export const getBidById = createAsyncThunk(
-  'bid/getById',
+  "bid/getById",
   async (bidId, { getState, rejectWithValue }) => {
     try {
       const { auth } = getState();
@@ -78,119 +85,177 @@ export const getBidById = createAsyncThunk(
       });
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data);
+      return rejectWithValue(
+        error.response?.data || { message: "Failed to get bid details" },
+      );
     }
-  }
+  },
 );
 
+// ================= INITIAL STATE =================
 const initialState = {
-  bids: [],
-  currentBid: null,
-  todaySummary: null,
-  isLoading: false,
-  isError: false,
-  message: '',
+  bids: [], // ✅ Array of bids
+  currentBid: null, // Single bid details
+  todaySummary: null, // Today's summary
+  loading: false, // ✅ Changed from isLoading
+  error: null, // ✅ Changed from isError
+  message: "", // Success/error message
   pagination: {
     page: 1,
-    limit: 20,
+    limit: 10,
     total: 0,
     pages: 0,
   },
+  stats: {
+    summary: [],
+    gameTypeSummary: [],
+  },
 };
 
+// ================= SLICE =================
 const bidSlice = createSlice({
-  name: 'bid',
+  name: "bid",
   initialState,
   reducers: {
     clearBidError: (state) => {
-      state.isError = false;
-      state.message = '';
+      state.error = null;
+      state.message = "";
+    },
+    clearBidMessage: (state) => {
+      state.message = "";
     },
     clearCurrentBid: (state) => {
       state.currentBid = null;
     },
+    resetBidState: () => initialState,
   },
   extraReducers: (builder) => {
     builder
-      // Place bid
+      // ========== PLACE BID ==========
       .addCase(placeBid.pending, (state) => {
-        state.isLoading = true;
+        state.loading = true;
+        state.error = null;
+        state.message = "";
       })
       .addCase(placeBid.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.currentBid = action.payload.data.bid;
-        state.isError = false;
-        state.message = action.payload.message;
+        state.loading = false;
+        state.currentBid = action.payload?.data?.bid || null;
+        state.error = null;
+        state.message = action.payload?.message || "Bid placed successfully";
       })
       .addCase(placeBid.rejected, (state, action) => {
-        state.isLoading = false;
-        state.isError = true;
-        state.message = action.payload?.message || 'Failed to place bid';
+        state.loading = false;
+        state.error = action.payload?.message || "Failed to place bid";
+        state.message = "";
       })
-      // Get bidding history
+
+      // ========== GET BIDDING HISTORY ==========
       .addCase(getBiddingHistory.pending, (state) => {
-        state.isLoading = true;
+        state.loading = true;
+        state.error = null;
       })
       .addCase(getBiddingHistory.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.bids = action.payload.data;
-        state.pagination = action.payload.pagination;
-        state.isError = false;
+        state.loading = false;
+
+        // ✅ FIX: Properly extract data from response
+        const responseData = action.payload?.data || {};
+
+        // Ensure bids is always an array
+        state.bids = Array.isArray(responseData.bids) ? responseData.bids : [];
+
+        // Set pagination
+        state.pagination = responseData.pagination || {
+          page: 1,
+          limit: 10,
+          total: state.bids.length,
+          pages: Math.ceil(state.bids.length / 10) || 1,
+        };
+
+        // Set stats if available
+        if (responseData.summary) {
+          state.stats.summary = responseData.summary;
+        }
+        if (responseData.gameTypeSummary) {
+          state.stats.gameTypeSummary = responseData.gameTypeSummary;
+        }
+
+        state.error = null;
       })
       .addCase(getBiddingHistory.rejected, (state, action) => {
-        state.isLoading = false;
-        state.isError = true;
-        state.message = action.payload?.message || 'Failed to get bidding history';
+        state.loading = false;
+        state.error =
+          action.payload?.message || "Failed to get bidding history";
+        state.bids = [];
       })
-      // Get today summary
+
+      // ========== GET TODAY SUMMARY ==========
       .addCase(getTodayBidsSummary.pending, (state) => {
-        state.isLoading = true;
+        state.loading = true;
+        state.error = null;
       })
       .addCase(getTodayBidsSummary.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.todaySummary = action.payload.data;
-        state.isError = false;
+        state.loading = false;
+        state.todaySummary = action.payload?.data || null;
+        state.error = null;
       })
       .addCase(getTodayBidsSummary.rejected, (state, action) => {
-        state.isLoading = false;
-        state.isError = true;
-        state.message = action.payload?.message || 'Failed to get today summary';
+        state.loading = false;
+        state.error = action.payload?.message || "Failed to get today summary";
       })
-      // Cancel bid
+
+      // ========== CANCEL BID ==========
       .addCase(cancelBid.pending, (state) => {
-        state.isLoading = true;
+        state.loading = true;
+        state.error = null;
+        state.message = "";
       })
       .addCase(cancelBid.fulfilled, (state, action) => {
-        state.isLoading = false;
-        // Update bid status in list
-        const index = state.bids.findIndex((b) => b._id === action.payload.data.bidId);
-        if (index !== -1) {
-          state.bids[index].status = 'cancelled';
+        state.loading = false;
+        state.message = action.payload?.message || "Bid cancelled successfully";
+
+        // ✅ Update bid status in list
+        const cancelledBidId = action.payload?.data?.bidId || action.meta?.arg;
+        if (cancelledBidId) {
+          const index = state.bids.findIndex((b) => b._id === cancelledBidId);
+          if (index !== -1) {
+            state.bids[index] = {
+              ...state.bids[index],
+              status: "cancelled",
+            };
+          }
         }
-        state.isError = false;
-        state.message = action.payload.message;
+        state.error = null;
       })
       .addCase(cancelBid.rejected, (state, action) => {
-        state.isLoading = false;
-        state.isError = true;
-        state.message = action.payload?.message || 'Failed to cancel bid';
+        state.loading = false;
+        state.error = action.payload?.message || "Failed to cancel bid";
+        state.message = "";
       })
-      // Get bid by ID
+
+      // ========== GET BID BY ID ==========
       .addCase(getBidById.pending, (state) => {
-        state.isLoading = true;
+        state.loading = true;
+        state.error = null;
       })
       .addCase(getBidById.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.currentBid = action.payload.data;
-        state.isError = false;
+        state.loading = false;
+        state.currentBid = action.payload?.data || null;
+        state.error = null;
       })
       .addCase(getBidById.rejected, (state, action) => {
-        state.isLoading = false;
-        state.isError = true;
-        state.message = action.payload?.message || 'Failed to get bid details';
+        state.loading = false;
+        state.error = action.payload?.message || "Failed to get bid details";
+        state.currentBid = null;
       });
   },
 });
 
-export const { clearBidError, clearCurrentBid } = bidSlice.actions;
+// ================= EXPORT ACTIONS =================
+export const {
+  clearBidError,
+  clearBidMessage,
+  clearCurrentBid,
+  resetBidState,
+} = bidSlice.actions;
+
 export default bidSlice.reducer;

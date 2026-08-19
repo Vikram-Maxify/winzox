@@ -33,15 +33,23 @@ import {
 
 const BidsHistory = () => {
   const dispatch = useDispatch();
-  const { bids, loading, pagination, error, message } = useSelector(
-    (state) => state.bid,
-  );
+
+  // ✅ FIX: Safe state extraction with fallbacks
+  const bidState = useSelector((state) => state.bid) || {};
+  const {
+    bids = [], // ✅ Default empty array
+    loading = false,
+    pagination = { total: 0, pages: 0, page: 1, limit: 10 },
+    error = null,
+    message = null,
+  } = bidState;
+
   const [filter, setFilter] = useState({
     status: "",
     page: 1,
     limit: 10,
   });
-  const [actionMessage, setActionMessage] = useState("");
+  const [actionMessage, setActionMessage] = useState(null);
   const [selectedBid, setSelectedBid] = useState(null);
 
   useEffect(() => {
@@ -52,13 +60,13 @@ const BidsHistory = () => {
     if (error) {
       setActionMessage({ type: "error", text: error });
       setTimeout(() => {
-        setActionMessage("");
+        setActionMessage(null);
         dispatch(clearBidError());
       }, 5000);
     }
     if (message) {
       setActionMessage({ type: "success", text: message });
-      setTimeout(() => setActionMessage(""), 3000);
+      setTimeout(() => setActionMessage(null), 3000);
     }
   }, [error, message, dispatch]);
 
@@ -158,13 +166,18 @@ const BidsHistory = () => {
     }).format(amount || 0);
   };
 
+  // ✅ FIX: Ensure bids is an array before using array methods
+  const bidsArray = Array.isArray(bids) ? bids : [];
+
   // Calculate statistics
-  const totalBids = bids?.length || 0;
-  const totalWon = bids?.filter((b) => b.status === "won").length || 0;
-  const totalPending = bids?.filter((b) => b.status === "pending").length || 0;
-  const totalAmount = bids?.reduce((sum, b) => sum + b.bidAmount, 0) || 0;
-  const totalWinAmount =
-    bids?.reduce((sum, b) => sum + (b.winAmount || 0), 0) || 0;
+  const totalBids = bidsArray.length;
+  const totalWon = bidsArray.filter((b) => b.status === "won").length;
+  const totalPending = bidsArray.filter((b) => b.status === "pending").length;
+  const totalAmount = bidsArray.reduce((sum, b) => sum + (b.bidAmount || 0), 0);
+  const totalWinAmount = bidsArray.reduce(
+    (sum, b) => sum + (b.winAmount || 0),
+    0,
+  );
 
   if (loading) {
     return (
@@ -201,7 +214,7 @@ const BidsHistory = () => {
                     </h1>
                     <p className="text-xs sm:text-sm text-gray-500 flex items-center gap-1">
                       <Sparkles size={12} className="text-amber-400" />
-                      {pagination.total || 0} total bids placed
+                      {pagination?.total || 0} total bids placed
                     </p>
                   </div>
                 </div>
@@ -251,7 +264,7 @@ const BidsHistory = () => {
         </div>
 
         {/* Stats Cards - Mobile Grid */}
-        {bids?.length > 0 && (
+        {bidsArray.length > 0 && (
           <div className="grid grid-cols-2 gap-3">
             {[
               {
@@ -333,9 +346,9 @@ const BidsHistory = () => {
         )}
 
         {/* Mobile Card View */}
-        {bids?.length > 0 ? (
+        {bidsArray.length > 0 ? (
           <div className="space-y-3">
-            {bids.map((bid) => {
+            {bidsArray.map((bid) => {
               const statusConfig = getStatusConfig(bid.status);
               const StatusIcon = statusConfig.icon;
               const gameTypeDisplay = getGameTypeDisplay(bid.gameType);
@@ -484,7 +497,7 @@ const BidsHistory = () => {
             {/* Pagination - Mobile Optimized */}
             <div className="flex flex-col gap-2 pt-2">
               <span className="text-center text-sm text-gray-600 font-medium">
-                Showing {bids.length} of {pagination.total} bids
+                Showing {bidsArray.length} of {pagination?.total || 0} bids
               </span>
               <div className="flex justify-center gap-2">
                 <button
@@ -501,16 +514,16 @@ const BidsHistory = () => {
                   Previous
                 </button>
                 <span className="px-4 py-2 rounded-xl text-sm font-bold bg-gradient-to-r from-amber-400 to-orange-400 text-white shadow-lg shadow-amber-500/30">
-                  {filter.page} / {pagination.pages}
+                  {filter.page} / {pagination?.pages || 1}
                 </span>
                 <button
                   onClick={() =>
                     setFilter({
                       ...filter,
-                      page: Math.min(pagination.pages, filter.page + 1),
+                      page: Math.min(pagination?.pages || 1, filter.page + 1),
                     })
                   }
-                  disabled={filter.page === pagination.pages}
+                  disabled={filter.page === (pagination?.pages || 1)}
                   className="flex items-center gap-1 px-4 py-2 border border-gray-200 rounded-xl text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 bg-white/50 backdrop-blur-sm"
                 >
                   Next
