@@ -2,596 +2,1546 @@ const Result = require("../models/Result");
 const Bid = require("../models/Bid");
 const Market = require("../models/Market");
 const User = require("../models/authmodel");
+const BettingBonus = require("../models/BettingBonus");
 const mongoose = require("mongoose");
 
-// ================= HELPER FUNCTIONS =================
+// ==========================================================
+// GAME TYPES
+// ==========================================================
 
-// Check if a bid wins based on game type and winning number
-const checkBidWin = (bidNumber, gameType, winningNumber) => {
-  const winningNumStr = String(winningNumber).trim();
-  const bidNumStr = String(bidNumber).trim();
-  
+const GAME_TYPES = [
+  "single",
+  "jodi",
+  "panna",
+  "half-sangam",
+  "full-sangam",
+  "last-digit",
+  "first-digit",
+];
+
+// ==========================================================
+// FORMAT NUMBER
+// ==========================================================
+
+const formatWinningNumber = (value, gameType) => {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  let number = String(value).trim();
+
   switch (gameType) {
-    case 'single':
+    case "single":
+      if (!/^[0-9]$/.test(number)) {
+        throw new Error(
+          "Single winning number must be 0-9"
+        );
+      }
+
+      return number;
+
+    case "jodi":
+      if (!/^[0-9]{1,2}$/.test(number)) {
+        throw new Error(
+          "Jodi winning number must be 00-99"
+        );
+      }
+
+      return number.padStart(2, "0");
+
+    case "panna":
+      if (!/^[0-9]{1,3}$/.test(number)) {
+        throw new Error(
+          "Panna winning number must be 000-999"
+        );
+      }
+
+      return number.padStart(3, "0");
+
+    case "half-sangam":
+      if (!/^[0-9]{1,3}$/.test(number)) {
+        throw new Error(
+          "Half Sangam winning number must be 1-3 digits"
+        );
+      }
+
+      return number;
+
+    case "full-sangam":
+      if (!/^[0-9]{1,2}$/.test(number)) {
+        throw new Error(
+          "Full Sangam winning number must be 00-99"
+        );
+      }
+
+      return number.padStart(2, "0");
+
+    case "last-digit":
+      if (!/^[0-9]{1,2}$/.test(number)) {
+        throw new Error(
+          "Last digit winning number must be 00-99"
+        );
+      }
+
+      return number.padStart(2, "0");
+
+    case "first-digit":
+      if (!/^[0-9]{1,2}$/.test(number)) {
+        throw new Error(
+          "First digit winning number must be 00-99"
+        );
+      }
+
+      return number.padStart(2, "0");
+
+    default:
+      throw new Error(
+        `Invalid game type: ${gameType}`
+      );
+  }
+};
+
+// ==========================================================
+// CHECK BID WIN
+// ==========================================================
+
+const checkBidWin = (
+  bidNumber,
+  gameType,
+  winningNumber
+) => {
+  if (
+    winningNumber === undefined ||
+    winningNumber === null
+  ) {
+    return false;
+  }
+
+  const winningNumStr =
+    String(winningNumber).trim();
+
+  const bidNumStr =
+    String(bidNumber).trim();
+
+  switch (gameType) {
+    case "single":
       return winningNumStr === bidNumStr;
-      
-    case 'jodi':
-      return winningNumStr === bidNumStr;
-      
-    case 'panna':
-      return winningNumStr === bidNumStr;
-      
-    case 'half-sangam':
-      return winningNumStr === bidNumStr || 
-             winningNumStr.slice(-1) === bidNumStr.slice(-1);
-             
-    case 'full-sangam':
-      return winningNumStr.slice(-2) === bidNumStr;
-      
-    case 'last-digit':
-      const bidLastDigit = bidNumStr.slice(-1);
-      const winningLastDigit = winningNumStr.slice(-1);
-      return bidLastDigit === winningLastDigit;
-      
-    case 'first-digit':
-      const bidFirstDigit = bidNumStr.charAt(0);
-      const winningFirstDigit = winningNumStr.charAt(0);
-      return bidFirstDigit === winningFirstDigit;
-      
+
+    case "jodi":
+      return (
+        winningNumStr ===
+        bidNumStr.padStart(2, "0")
+      );
+
+    case "panna":
+      return (
+        winningNumStr ===
+        bidNumStr.padStart(3, "0")
+      );
+
+    case "half-sangam":
+      return (
+        winningNumStr === bidNumStr ||
+        winningNumStr.slice(-1) ===
+          bidNumStr.slice(-1)
+      );
+
+    case "full-sangam":
+      return (
+        winningNumStr.slice(-2) ===
+        bidNumStr.padStart(2, "0")
+      );
+
+    case "last-digit":
+      return (
+        winningNumStr.slice(-1) ===
+        bidNumStr.slice(-1)
+      );
+
+    case "first-digit":
+      return (
+        winningNumStr.charAt(0) ===
+        bidNumStr.charAt(0)
+      );
+
     default:
       return false;
   }
 };
 
-// Format winning number based on game type
-const formatWinningNumber = (winningNumber, gameType) => {
-  let formatted = String(winningNumber).trim();
-  
-  if (["jodi", "full-sangam", "last-digit", "first-digit"].includes(gameType)) {
-    formatted = formatted.padStart(2, "0");
-  } else if (gameType === "panna") {
-    formatted = formatted.padStart(3, "0");
-  } else if (gameType === "half-sangam" && formatted.length === 2) {
-    formatted = formatted.padStart(3, "0");
+// ==========================================================
+// ADD REFERRAL BETTING BONUS
+// ==========================================================
+
+const addReferralBettingBonus = async (
+  winner,
+  winAmount
+) => {
+  try {
+    if (!winner || !winAmount || winAmount <= 0) {
+      return {
+        success: false,
+        bonus: 0,
+        message: "Invalid winner or win amount",
+      };
+    }
+
+    // ======================================================
+    // GET ACTIVE BETTING BONUS
+    // ======================================================
+
+    const bettingBonus =
+      await BettingBonus.findOne({
+        isActive: true,
+      });
+
+    if (!bettingBonus) {
+      return {
+        success: false,
+        bonus: 0,
+        message: "Betting bonus is inactive",
+      };
+    }
+
+    const percentage =
+      Number(bettingBonus.percentage) || 0;
+
+    if (
+      percentage <= 0 ||
+      percentage > 100
+    ) {
+      return {
+        success: false,
+        bonus: 0,
+        message: "Invalid betting bonus percentage",
+      };
+    }
+
+    // ======================================================
+    // FIND REFERRER
+    // ======================================================
+
+    let referrer = null;
+
+    // ------------------------------------------------------
+    // 1. referredByUser
+    // ------------------------------------------------------
+
+    if (winner.referredByUser) {
+      if (
+        mongoose.Types.ObjectId.isValid(
+          winner.referredByUser
+        )
+      ) {
+        referrer =
+          await User.findById(
+            winner.referredByUser
+          );
+      }
+    }
+
+    // ------------------------------------------------------
+    // 2. referredBy as ObjectId
+    // ------------------------------------------------------
+
+    if (
+      !referrer &&
+      winner.referredBy
+    ) {
+      if (
+        mongoose.Types.ObjectId.isValid(
+          winner.referredBy
+        )
+      ) {
+        referrer =
+          await User.findById(
+            winner.referredBy
+          );
+      }
+    }
+
+    // ------------------------------------------------------
+    // 3. referredBy as referral code
+    // ------------------------------------------------------
+
+    if (
+      !referrer &&
+      winner.referredBy
+    ) {
+      referrer =
+        await User.findOne({
+          referralCode:
+            String(winner.referredBy).trim(),
+        });
+    }
+
+    // ======================================================
+    // NO REFERRER
+    // ======================================================
+
+    if (!referrer) {
+      return {
+        success: false,
+        bonus: 0,
+        message: "No referrer found",
+      };
+    }
+
+    // ======================================================
+    // PREVENT SELF REFERRAL
+    // ======================================================
+
+    if (
+      String(referrer._id) ===
+      String(winner._id)
+    ) {
+      return {
+        success: false,
+        bonus: 0,
+        message: "Self referral is not allowed",
+      };
+    }
+
+    // ======================================================
+    // CALCULATE BONUS
+    // ======================================================
+
+    const referralBonus =
+      Number(
+        (
+          (Number(winAmount) * percentage) /
+          100
+        ).toFixed(2)
+      );
+
+    if (referralBonus <= 0) {
+      return {
+        success: false,
+        bonus: 0,
+        message: "Referral bonus is zero",
+      };
+    }
+
+    // ======================================================
+    // ADD TO REFERRER BALANCE + EARNING
+    // ======================================================
+
+    await User.updateOne(
+      {
+        _id: referrer._id,
+      },
+      {
+        $inc: {
+          balance: referralBonus,
+          referralEarning: referralBonus,
+        },
+      }
+    );
+
+    console.log(
+      "=================================================="
+    );
+
+    console.log(
+      "REFERRAL BETTING BONUS ADDED"
+    );
+
+    console.log(
+      "Winner:",
+      winner._id
+    );
+
+    console.log(
+      "Winner Name:",
+      winner.name
+    );
+
+    console.log(
+      "Winner Amount:",
+      winAmount
+    );
+
+    console.log(
+      "Bonus Percentage:",
+      percentage
+    );
+
+    console.log(
+      "Referrer:",
+      referrer._id
+    );
+
+    console.log(
+      "Referrer Name:",
+      referrer.name
+    );
+
+    console.log(
+      "Referral Bonus:",
+      referralBonus
+    );
+
+    console.log(
+      "=================================================="
+    );
+
+    return {
+      success: true,
+      bonus: referralBonus,
+      percentage,
+      referrerId: referrer._id,
+      referrerName: referrer.name,
+    };
+  } catch (error) {
+    console.error(
+      "Add Referral Betting Bonus Error:",
+      error
+    );
+
+    return {
+      success: false,
+      bonus: 0,
+      message: error.message,
+    };
   }
-  
-  return formatted;
 };
 
-// ============================================================
-// ================= DECLARE RESULT ===========================
-// ============================================================
+// ==========================================================
+// DECLARE RESULT
+// ==========================================================
 
-// Declare result (Admin Only)
-exports.declareResult = async (req, res) => {
+exports.declareResult = async (
+  req,
+  res
+) => {
   try {
-    const { marketId, winningNumber, resultDate, gameType } = req.body;
-    const adminId = req.user.id;
+    const {
+      marketId,
+      winningNumber,
+      resultDate,
+      remarks,
+    } = req.body;
 
-    // Validate required fields
-    if (!marketId || !winningNumber) {
+    const adminId =
+      req.user?.id;
+
+    // ======================================================
+    // VALIDATION
+    // ======================================================
+
+    if (!marketId) {
       return res.status(400).json({
         success: false,
-        message: "Market ID and winning number are required",
+        message:
+          "Market ID is required",
       });
     }
 
-    // Check market
-    const market = await Market.findById(marketId);
+    if (
+      !winningNumber ||
+      typeof winningNumber !== "object" ||
+      Array.isArray(winningNumber)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Winning numbers are required as an object",
+      });
+    }
+
+    if (
+      !mongoose.Types.ObjectId.isValid(
+        marketId
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid market ID",
+      });
+    }
+
+    // ======================================================
+    // FIND MARKET
+    // ======================================================
+
+    const market =
+      await Market.findById(
+        marketId
+      );
+
     if (!market) {
       return res.status(404).json({
         success: false,
-        message: "Market not found",
+        message:
+          "Market not found",
       });
     }
 
-    // Get all pending bids by game type for this market
-    const pendingBidsByGameType = await Bid.aggregate([
-      {
-        $match: {
-          marketId: new mongoose.Types.ObjectId(marketId),
-          status: "pending"
-        }
-      },
-      {
-        $group: {
-          _id: "$gameType",
-          count: { $sum: 1 },
-          bids: { 
-            $push: {
-              _id: "$_id",
-              userId: "$userId",
-              number: "$number",
-              bidAmount: "$bidAmount",
-              possibleWinAmount: "$possibleWinAmount"
-            }
-          }
-        }
-      }
-    ]);
+    // ======================================================
+    // MARKET GAME TYPES
+    // ======================================================
 
-    // Check if there are any pending bids
-    if (pendingBidsByGameType.length === 0) {
-      // Check if there are any bids at all
-      const totalBids = await Bid.countDocuments({ marketId: marketId });
-      
-      if (totalBids === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "No bids found for this market. Please create bids first.",
-        });
-      }
+    const marketGameTypes =
+      Array.isArray(
+        market.gameTypes
+      )
+        ? market.gameTypes
+        : [];
 
-      // Check what statuses exist
-      const statuses = await Bid.aggregate([
-        {
-          $match: {
-            marketId: new mongoose.Types.ObjectId(marketId)
-          }
-        },
-        {
-          $group: {
-            _id: "$status",
-            count: { $sum: 1 },
-            gameTypes: { $addToSet: "$gameType" }
-          }
-        }
-      ]);
-
+    if (
+      marketGameTypes.length === 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "No pending bids found. All bids are already processed.",
-        data: {
-          totalBids,
-          statuses,
-          marketGameTypes: market.gameTypes,
-        }
+        message:
+          "No game types configured for this market",
       });
     }
 
-    // Get available game types with pending bids
-    const availableGameTypes = pendingBidsByGameType.map(item => item._id);
-    
-    // Determine which game type to use
-    let selectedGameType = gameType;
-    
-    // If no game type specified or specified game type has no pending bids
-    if (!selectedGameType || !availableGameTypes.includes(selectedGameType)) {
-      // Use the first available game type with pending bids
-      selectedGameType = availableGameTypes[0];
-    }
+    // ======================================================
+    // RESULT DATE
+    // ======================================================
 
-    // Verify game type is supported by market
-    if (!market.gameTypes.includes(selectedGameType)) {
+    const resultDateObj =
+      new Date(
+        resultDate || new Date()
+      );
+
+    if (
+      isNaN(
+        resultDateObj.getTime()
+      )
+    ) {
       return res.status(400).json({
         success: false,
-        message: `Game type "${selectedGameType}" has pending bids but is not supported by this market.`,
-        marketGameTypes: market.gameTypes,
-        pendingGameTypes: availableGameTypes,
+        message:
+          "Invalid result date",
       });
     }
 
-    // Check if market already has result declared
-    if (market.isResultDeclared) {
-      // Check if all game types have results
-      const resultDateObj = new Date(resultDate || new Date());
-      const declaredResults = await Result.find({
+    // ======================================================
+    // CHECK EXISTING RESULT
+    // ======================================================
+
+    const existingResult =
+      await Result.findOne({
         marketId,
-        resultDate: resultDateObj,
+        resultDate:
+          resultDateObj,
       });
-
-      if (declaredResults.length >= market.gameTypes.length) {
-        return res.status(400).json({
-          success: false,
-          message: "All results already declared for this market on this date.",
-        });
-      }
-    }
-
-    // Format winning number
-    const formattedWinningNumber = formatWinningNumber(winningNumber, selectedGameType);
-
-    const resultDateObj = new Date(resultDate || new Date());
-
-    // Check if result already exists for this game type
-    const existingResult = await Result.findOne({
-      marketId,
-      resultDate: resultDateObj,
-      gameType: selectedGameType,
-    });
 
     if (existingResult) {
       return res.status(400).json({
         success: false,
-        message: `Result already declared for ${selectedGameType} on ${resultDateObj.toDateString()}`,
+        message:
+          "Result already declared for this market on this date",
+        data: {
+          resultId:
+            existingResult._id,
+          winningNumber:
+            existingResult.winningNumber,
+        },
       });
     }
 
-    // Get pending bids for the selected game type
-    const pendingBidsForGameType = pendingBidsByGameType.find(
-      item => item._id === selectedGameType
-    );
+    // ======================================================
+    // FORMAT ALL NUMBERS
+    // ======================================================
 
-    if (!pendingBidsForGameType || pendingBidsForGameType.bids.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: `No pending bids found for game type: ${selectedGameType}`,
-        availableGameTypes,
-      });
-    }
+    const formattedWinningNumbers =
+      {};
 
-    const pendingBids = pendingBidsForGameType.bids;
+    for (
+      const gameType of marketGameTypes
+    ) {
+      const value =
+        winningNumber[
+          gameType
+        ];
 
-    // Process each bid
-    let totalPayout = 0;
-    let totalWinningBids = 0;
-    const winningBidsList = [];
-    const losingBidsList = [];
+      if (
+        value === undefined ||
+        value === null ||
+        value === ""
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            `Winning number is required for ${gameType}`,
+          gameType,
+          marketGameTypes,
+        });
+      }
 
-    for (const bidData of pendingBids) {
-      const isWin = checkBidWin(bidData.number, selectedGameType, formattedWinningNumber);
-      
-      // Find the actual bid document to update
-      const bid = await Bid.findById(bidData._id);
-      
-      if (!bid) continue;
-
-      if (isWin) {
-        const winAmount = bidData.possibleWinAmount || 0;
-        totalPayout += winAmount;
-        totalWinningBids++;
-        
-        // Update user balance
-        const user = await User.findById(bidData.userId);
-        if (user) {
-          user.balance = (user.balance || 0) + winAmount;
-          await user.save();
-        }
-
-        // Update bid
-        bid.status = "won";
-        bid.winAmount = winAmount;
-        bid.resultNumber = formattedWinningNumber;
-        await bid.save();
-        
-        winningBidsList.push(bid);
-      } else {
-        // Update bid - lost
-        bid.status = "lost";
-        bid.resultNumber = formattedWinningNumber;
-        await bid.save();
-        losingBidsList.push(bid);
+      try {
+        formattedWinningNumbers[
+          gameType
+        ] =
+          formatWinningNumber(
+            value,
+            gameType
+          );
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message:
+            error.message,
+          gameType,
+          value,
+        });
       }
     }
 
-    // Create result record
-    const result = new Result({
-      marketId,
-      marketName: market.name,
-      gameType: selectedGameType,
-      winningNumber: formattedWinningNumber,
-      resultDate: resultDateObj,
-      declaredBy: adminId,
-      totalBids: pendingBids.length,
-      totalWinningBids: totalWinningBids,
-      totalPayout: totalPayout,
-      status: "declared",
-    });
+    // ======================================================
+    // GET ALL PENDING BIDS
+    // ======================================================
+
+    const pendingBids =
+      await Bid.find({
+        marketId,
+        status: "pending",
+      });
+
+    if (
+      pendingBids.length === 0
+    ) {
+      const totalBids =
+        await Bid.countDocuments({
+          marketId,
+        });
+
+      if (totalBids === 0) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "No bids found for this market. Please create bids first.",
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "No pending bids found. All bids are already processed.",
+        totalBids,
+      });
+    }
+
+    // ======================================================
+    // PROCESS BIDS
+    // ======================================================
+
+    let totalPayout = 0;
+    let totalWinningBids = 0;
+
+    let totalReferralBonus = 0;
+    let totalReferralBonusCount = 0;
+
+    const winningBidsList = [];
+    const losingBidsList = [];
+    const referralBonusList = [];
+
+    // ======================================================
+    // PROCESS EACH BID
+    // ======================================================
+
+    for (
+      const bid of pendingBids
+    ) {
+      const bidGameType =
+        String(
+          bid.gameType || ""
+        ).trim();
+
+      const winningNum =
+        formattedWinningNumbers[
+          bidGameType
+        ];
+
+      // ====================================================
+      // GAME TYPE NOT CONFIGURED
+      // ====================================================
+
+      if (
+        winningNum === undefined
+      ) {
+        bid.status = "lost";
+        bid.resultNumber = null;
+
+        await bid.save();
+
+        losingBidsList.push(
+          bid
+        );
+
+        continue;
+      }
+
+      // ====================================================
+      // CHECK WIN
+      // ====================================================
+
+      const isWin =
+        checkBidWin(
+          bid.number,
+          bidGameType,
+          winningNum
+        );
+
+      // ====================================================
+      // WIN
+      // ====================================================
+
+      if (isWin) {
+        const winAmount =
+          Number(
+            bid.possibleWinAmount
+          ) || 0;
+
+        totalPayout +=
+          winAmount;
+
+        totalWinningBids++;
+
+        // ==================================================
+        // FIND WINNER
+        // ==================================================
+
+        const user =
+          await User.findById(
+            bid.userId
+          );
+
+        if (user) {
+          // ================================================
+          // ADD WINNING AMOUNT TO WINNER
+          // ================================================
+
+          user.balance =
+            (Number(
+              user.balance
+            ) || 0) +
+            winAmount;
+
+          await user.save();
+
+          // ================================================
+          // REFERRAL BETTING BONUS
+          // ================================================
+
+          const referralResult =
+            await addReferralBettingBonus(
+              user,
+              winAmount
+            );
+
+          if (
+            referralResult.success
+          ) {
+            totalReferralBonus +=
+              referralResult.bonus;
+
+            totalReferralBonusCount++;
+
+            referralBonusList.push({
+              winnerId:
+                user._id,
+
+              winnerName:
+                user.name,
+
+              winAmount,
+
+              percentage:
+                referralResult.percentage,
+
+              referrerId:
+                referralResult.referrerId,
+
+              referrerName:
+                referralResult.referrerName,
+
+              bonus:
+                referralResult.bonus,
+            });
+          }
+        }
+
+        // ==================================================
+        // UPDATE BID
+        // ==================================================
+
+        bid.status = "won";
+
+        bid.winAmount =
+          winAmount;
+
+        bid.resultNumber =
+          winningNum;
+
+        await bid.save();
+
+        winningBidsList.push(
+          bid
+        );
+      }
+
+      // ====================================================
+      // LOSS
+      // ====================================================
+
+      else {
+        bid.status = "lost";
+
+        bid.resultNumber =
+          winningNum;
+
+        await bid.save();
+
+        losingBidsList.push(
+          bid
+        );
+      }
+    }
+
+    // ======================================================
+    // CREATE ONE RESULT
+    // ======================================================
+
+    const result =
+      new Result({
+        marketId,
+
+        marketName:
+          market.name,
+
+        winningNumber:
+          formattedWinningNumbers,
+
+        resultDate:
+          resultDateObj,
+
+        declaredBy:
+          adminId,
+
+        totalBids:
+          pendingBids.length,
+
+        totalWinningBids,
+
+        totalPayout,
+
+        status:
+          "declared",
+
+        remarks:
+          remarks || null,
+      });
 
     await result.save();
 
-    // Check if all game types have results declared for this date
-    const allResults = await Result.find({
-      marketId,
-      resultDate: resultDateObj,
-    });
+    // ======================================================
+    // UPDATE MARKET
+    // ======================================================
 
-    // If all game types have results, mark market as fully declared
-    if (allResults.length >= market.gameTypes.length) {
-      market.isResultDeclared = true;
-      await market.save();
-    }
+    market.isResultDeclared =
+      true;
+
+    await market.save();
+
+    // ======================================================
+    // RESPONSE
+    // ======================================================
 
     return res.status(200).json({
       success: true,
-      message: `Result declared successfully for ${selectedGameType}`,
-      data: {
-        result: {
-          id: result._id,
-          marketId: result.marketId,
-          marketName: result.marketName,
-          gameType: result.gameType,
-          winningNumber: result.winningNumber,
-          resultDate: result.resultDate,
-          totalBids: result.totalBids,
-          totalWinningBids: result.totalWinningBids,
-          totalPayout: result.totalPayout,
-          status: result.status,
-          createdAt: result.createdAt,
-        },
-        summary: {
-          totalBids: pendingBids.length,
-          totalWinningBids: totalWinningBids,
-          totalLosingBids: pendingBids.length - totalWinningBids,
-          totalPayout: totalPayout,
-        },
-        winningBids: winningBidsList.map(bid => ({
-          id: bid._id,
-          userId: bid.userId,
-          number: bid.number,
-          bidAmount: bid.bidAmount,
-          winAmount: bid.winAmount,
-        })),
-        pendingBidsByGameType: pendingBidsByGameType.map(item => ({
-          gameType: item._id,
-          count: item.count,
-        })),
-      },
-    });
-  } catch (error) {
-    console.error("Declare Result Error:", error);
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
 
-// ============================================================
-// ================= GET RESULTS ==============================
-// ============================================================
+      message:
+        "All results declared successfully",
 
-// Get all results
-exports.getResults = async (req, res) => {
-  try {
-    const { marketId, startDate, endDate, page = 1, limit = 20 } = req.query;
-
-    const filter = {};
-    if (marketId) filter.marketId = marketId;
-    if (startDate || endDate) {
-      filter.resultDate = {};
-      if (startDate) filter.resultDate.$gte = new Date(startDate);
-      if (endDate) filter.resultDate.$lte = new Date(endDate);
-    }
-
-    const results = await Result.find(filter)
-      .populate("marketId", "name marketId gameTypes")
-      .populate("declaredBy", "name email")
-      .sort({ resultDate: -1 })
-      .skip((parseInt(page) - 1) * parseInt(limit))
-      .limit(parseInt(limit));
-
-    const total = await Result.countDocuments(filter);
-
-    res.json({
-      success: true,
-      data: results,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    console.error("Get Results Error:", error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// ============================================================
-// ================= GET RESULT BY ID =========================
-// ============================================================
-
-// Get result by ID
-exports.getResultById = async (req, res) => {
-  try {
-    const { resultId } = req.params;
-
-    const result = await Result.findById(resultId)
-      .populate("marketId", "name marketId gameTypes")
-      .populate("declaredBy", "name email");
-
-    if (!result) {
-      return res.status(404).json({
-        success: false,
-        message: "Result not found",
-      });
-    }
-
-    // Get winning bids for this result
-    const winningBids = await Bid.find({
-      marketId: result.marketId,
-      resultNumber: result.winningNumber,
-      status: "won",
-      gameType: result.gameType,
-    })
-      .populate("userId", "name email mobile")
-      .select("userId bidAmount winAmount number");
-
-    res.json({
-      success: true,
       data: {
         result,
-        winningBids,
-        totalWinners: winningBids.length,
+
+        summary: {
+          totalBids:
+            pendingBids.length,
+
+          totalWinningBids,
+
+          totalLosingBids:
+            losingBidsList.length,
+
+          totalPayout,
+
+          totalReferralBonus:
+            Number(
+              totalReferralBonus.toFixed(2)
+            ),
+
+          totalReferralBonusCount,
+
+          gameTypes:
+            Object.keys(
+              formattedWinningNumbers
+            ),
+        },
+
+        winningBids:
+          winningBidsList.map(
+            (bid) => ({
+              id: bid._id,
+
+              userId:
+                bid.userId,
+
+              gameType:
+                bid.gameType,
+
+              number:
+                bid.number,
+
+              bidAmount:
+                bid.bidAmount,
+
+              winAmount:
+                bid.winAmount,
+
+              resultNumber:
+                bid.resultNumber,
+            })
+          ),
+
+        losingBids:
+          losingBidsList.map(
+            (bid) => ({
+              id: bid._id,
+
+              userId:
+                bid.userId,
+
+              gameType:
+                bid.gameType,
+
+              number:
+                bid.number,
+
+              bidAmount:
+                bid.bidAmount,
+
+              resultNumber:
+                bid.resultNumber,
+            })
+          ),
+
+        referralBonuses:
+          referralBonusList,
       },
     });
   } catch (error) {
-    console.error("Get Result By ID Error:", error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+    console.error(
+      "Declare Result Error:",
+      error
+    );
 
-// ============================================================
-// ================= GET TODAY'S RESULTS ======================
-// ============================================================
-
-// Get today's results
-exports.getTodayResults = async (req, res) => {
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const results = await Result.find({
-      resultDate: { $gte: today, $lt: tomorrow },
-    })
-      .populate("marketId", "name marketId gameTypes")
-      .sort({ resultDate: -1 });
-
-    res.json({
-      success: true,
-      data: results,
-    });
-  } catch (error) {
-    console.error("Get Today Results Error:", error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// ============================================================
-// ================= GET RESULT STATISTICS ====================
-// ============================================================
-
-// Get result statistics
-exports.getResultStats = async (req, res) => {
-  try {
-    const stats = await Result.aggregate([
-      {
-        $group: {
-          _id: "$marketId",
-          totalResults: { $sum: 1 },
-          totalPayout: { $sum: "$totalPayout" },
-          totalWinningBids: { $sum: "$totalWinningBids" },
-          avgPayout: { $avg: "$totalPayout" },
-        },
-      },
-      {
-        $lookup: {
-          from: "markets",
-          localField: "_id",
-          foreignField: "_id",
-          as: "market",
-        },
-      },
-      {
-        $unwind: "$market",
-      },
-      {
-        $project: {
-          _id: 0,
-          marketId: "$_id",
-          marketName: "$market.name",
-          totalResults: 1,
-          totalPayout: 1,
-          totalWinningBids: 1,
-          avgPayout: { $round: ["$avgPayout", 2] },
-        },
-      },
-      {
-        $sort: { totalResults: -1 },
-      },
-    ]);
-
-    // Get overall stats
-    const overallStats = await Result.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalResults: { $sum: 1 },
-          totalPayout: { $sum: "$totalPayout" },
-          totalWinningBids: { $sum: "$totalWinningBids" },
-          totalBids: { $sum: "$totalBids" },
-          avgPayout: { $avg: "$totalPayout" },
-        }
-      }
-    ]);
-
-    res.json({
-      success: true,
-      data: {
-        byMarket: stats,
-        overall: overallStats[0] || {
-          totalResults: 0,
-          totalPayout: 0,
-          totalWinningBids: 0,
-          totalBids: 0,
-          avgPayout: 0,
-        },
-      },
-    });
-  } catch (error) {
-    console.error("Get Result Stats Error:", error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// ============================================================
-// ================= GET RESULTS BY GAME TYPE =================
-// ============================================================
-
-// Get results by game type
-exports.getResultsByGameType = async (req, res) => {
-  try {
-    const { gameType } = req.params;
-    const { startDate, endDate, page = 1, limit = 20 } = req.query;
-
-    const validGameTypes = [
-      "single", "jodi", "panna", "half-sangam", 
-      "full-sangam", "last-digit", "first-digit"
-    ];
-
-    if (!validGameTypes.includes(gameType)) {
+    if (
+      error.code === 11000
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid game type",
+        message:
+          "Result already exists for this market and date.",
       });
     }
 
-    const filter = { gameType };
-    if (startDate || endDate) {
-      filter.resultDate = {};
-      if (startDate) filter.resultDate.$gte = new Date(startDate);
-      if (endDate) filter.resultDate.$lte = new Date(endDate);
-    }
-
-    const results = await Result.find(filter)
-      .populate("marketId", "name marketId")
-      .populate("declaredBy", "name email")
-      .sort({ resultDate: -1 })
-      .skip((parseInt(page) - 1) * parseInt(limit))
-      .limit(parseInt(limit));
-
-    const total = await Result.countDocuments(filter);
-
-    res.json({
-      success: true,
-      data: results,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
-      },
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to declare result",
     });
-  } catch (error) {
-    console.error("Get Results By Game Type Error:", error);
-    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ============================================================
-// ================= EXPORT FUNCTIONS =========================
-// ============================================================
+// ==========================================================
+// GET ALL RESULTS
+// ==========================================================
+
+exports.getResults = async (
+  req,
+  res
+) => {
+  try {
+    const {
+      marketId,
+      startDate,
+      endDate,
+      page = 1,
+      limit = 20,
+    } = req.query;
+
+    const filter = {};
+
+    if (marketId) {
+      filter.marketId =
+        marketId;
+    }
+
+    if (
+      startDate ||
+      endDate
+    ) {
+      filter.resultDate = {};
+
+      if (startDate) {
+        filter.resultDate.$gte =
+          new Date(
+            startDate
+          );
+      }
+
+      if (endDate) {
+        filter.resultDate.$lte =
+          new Date(
+            endDate
+          );
+      }
+    }
+
+    const pageNumber =
+      Math.max(
+        1,
+        parseInt(page) || 1
+      );
+
+    const limitNumber =
+      Math.max(
+        1,
+        parseInt(limit) || 20
+      );
+
+    const results =
+      await Result.find(
+        filter
+      )
+        .populate(
+          "marketId",
+          "name marketId gameTypes"
+        )
+        .populate(
+          "declaredBy",
+          "name email"
+        )
+        .sort({
+          resultDate: -1,
+          createdAt: -1,
+        })
+        .skip(
+          (pageNumber - 1) *
+            limitNumber
+        )
+        .limit(
+          limitNumber
+        );
+
+    const total =
+      await Result.countDocuments(
+        filter
+      );
+
+    return res.json({
+      success: true,
+
+      data: results,
+
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        total,
+        pages: Math.ceil(
+          total /
+            limitNumber
+        ),
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Get Results Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message,
+    });
+  }
+};
+
+// ==========================================================
+// GET RESULT BY ID
+// ==========================================================
+
+exports.getResultById =
+  async (
+    req,
+    res
+  ) => {
+    try {
+      const {
+        resultId,
+      } = req.params;
+
+      const result =
+        await Result.findById(
+          resultId
+        )
+          .populate(
+            "marketId",
+            "name marketId gameTypes"
+          )
+          .populate(
+            "declaredBy",
+            "name email"
+          );
+
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Result not found",
+        });
+      }
+
+      const marketObjectId =
+        result.marketId?._id ||
+        result.marketId;
+
+      const winningBids =
+        await Bid.find({
+          marketId:
+            marketObjectId,
+
+          status: "won",
+
+          resultNumber: {
+            $ne: null,
+          },
+        })
+          .populate(
+            "userId",
+            "name email mobile"
+          )
+          .select(
+            "userId gameType bidAmount winAmount number resultNumber"
+          );
+
+      return res.json({
+        success: true,
+
+        data: {
+          result,
+
+          winningBids,
+
+          totalWinners:
+            winningBids.length,
+        },
+      });
+    } catch (error) {
+      console.error(
+        "Get Result By ID Error:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message,
+      });
+    }
+  };
+
+// ==========================================================
+// GET TODAY RESULTS
+// ==========================================================
+
+exports.getTodayResults =
+  async (
+    req,
+    res
+  ) => {
+    try {
+      const today =
+        new Date();
+
+      today.setHours(
+        0,
+        0,
+        0,
+        0
+      );
+
+      const tomorrow =
+        new Date(today);
+
+      tomorrow.setDate(
+        tomorrow.getDate() +
+          1
+      );
+
+      const results =
+        await Result.find({
+          resultDate: {
+            $gte: today,
+            $lt: tomorrow,
+          },
+
+          status:
+            "declared",
+        })
+          .populate(
+            "marketId",
+            "name marketId gameTypes"
+          )
+          .sort({
+            resultDate: -1,
+            createdAt: -1,
+          });
+
+      return res.json({
+        success: true,
+        data: results,
+      });
+    } catch (error) {
+      console.error(
+        "Get Today Results Error:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message,
+      });
+    }
+  };
+
+// ==========================================================
+// GET RESULT STATS
+// ==========================================================
+
+exports.getResultStats =
+  async (
+    req,
+    res
+  ) => {
+    try {
+      const stats =
+        await Result.aggregate([
+          {
+            $group: {
+              _id: "$marketId",
+
+              totalResults: {
+                $sum: 1,
+              },
+
+              totalPayout: {
+                $sum:
+                  "$totalPayout",
+              },
+
+              totalWinningBids: {
+                $sum:
+                  "$totalWinningBids",
+              },
+
+              totalBids: {
+                $sum:
+                  "$totalBids",
+              },
+
+              avgPayout: {
+                $avg:
+                  "$totalPayout",
+              },
+            },
+          },
+
+          {
+            $lookup: {
+              from: "markets",
+
+              localField:
+                "_id",
+
+              foreignField:
+                "_id",
+
+              as: "market",
+            },
+          },
+
+          {
+            $unwind:
+              "$market",
+          },
+
+          {
+            $project: {
+              _id: 0,
+
+              marketId:
+                "$_id",
+
+              marketName:
+                "$market.name",
+
+              totalResults: 1,
+
+              totalPayout: 1,
+
+              totalWinningBids: 1,
+
+              totalBids: 1,
+
+              avgPayout: {
+                $round: [
+                  "$avgPayout",
+                  2,
+                ],
+              },
+            },
+          },
+
+          {
+            $sort: {
+              totalResults: -1,
+            },
+          },
+        ]);
+
+      const overallStats =
+        await Result.aggregate([
+          {
+            $group: {
+              _id: null,
+
+              totalResults: {
+                $sum: 1,
+              },
+
+              totalPayout: {
+                $sum:
+                  "$totalPayout",
+              },
+
+              totalWinningBids: {
+                $sum:
+                  "$totalWinningBids",
+              },
+
+              totalBids: {
+                $sum:
+                  "$totalBids",
+              },
+
+              avgPayout: {
+                $avg:
+                  "$totalPayout",
+              },
+            },
+          },
+        ]);
+
+      return res.json({
+        success: true,
+
+        data: {
+          byMarket: stats,
+
+          overall:
+            overallStats[0] || {
+              totalResults: 0,
+              totalPayout: 0,
+              totalWinningBids: 0,
+              totalBids: 0,
+              avgPayout: 0,
+            },
+        },
+      });
+    } catch (error) {
+      console.error(
+        "Get Result Stats Error:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message,
+      });
+    }
+  };
+
+// ==========================================================
+// GET RESULTS BY GAME TYPE
+// ==========================================================
+
+exports.getResultsByGameType =
+  async (
+    req,
+    res
+  ) => {
+    try {
+      const {
+        gameType,
+      } = req.params;
+
+      const {
+        startDate,
+        endDate,
+        page = 1,
+        limit = 20,
+      } = req.query;
+
+      if (
+        !GAME_TYPES.includes(
+          gameType
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid game type",
+        });
+      }
+
+      const filter = {
+        [`winningNumber.${gameType}`]:
+          {
+            $ne: null,
+          },
+
+        status:
+          "declared",
+      };
+
+      if (
+        startDate ||
+        endDate
+      ) {
+        filter.resultDate = {};
+
+        if (startDate) {
+          filter.resultDate.$gte =
+            new Date(
+              startDate
+            );
+        }
+
+        if (endDate) {
+          filter.resultDate.$lte =
+            new Date(
+              endDate
+            );
+        }
+      }
+
+      const pageNumber =
+        Math.max(
+          1,
+          parseInt(page) || 1
+        );
+
+      const limitNumber =
+        Math.max(
+          1,
+          parseInt(limit) || 20
+        );
+
+      const results =
+        await Result.find(
+          filter
+        )
+          .populate(
+            "marketId",
+            "name marketId gameTypes"
+          )
+          .populate(
+            "declaredBy",
+            "name email"
+          )
+          .sort({
+            resultDate: -1,
+            createdAt: -1,
+          })
+          .skip(
+            (pageNumber - 1) *
+              limitNumber
+          )
+          .limit(
+            limitNumber
+          );
+
+      const total =
+        await Result.countDocuments(
+          filter
+        );
+
+      return res.json({
+        success: true,
+
+        data: results,
+
+        pagination: {
+          page: pageNumber,
+          limit: limitNumber,
+          total,
+          pages: Math.ceil(
+            total /
+              limitNumber
+          ),
+        },
+      });
+    } catch (error) {
+      console.error(
+        "Get Results By Game Type Error:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message,
+      });
+    }
+  };
+
+// ==========================================================
+// EXPORT
+// ==========================================================
 
 module.exports = {
-  declareResult: exports.declareResult,
-  getResults: exports.getResults,
-  getResultById: exports.getResultById,
-  getTodayResults: exports.getTodayResults,
-  getResultStats: exports.getResultStats,
-  getResultsByGameType: exports.getResultsByGameType,
+  declareResult:
+    exports.declareResult,
+
+  getResults:
+    exports.getResults,
+
+  getResultById:
+    exports.getResultById,
+
+  getTodayResults:
+    exports.getTodayResults,
+
+  getResultStats:
+    exports.getResultStats,
+
+  getResultsByGameType:
+    exports.getResultsByGameType,
 };

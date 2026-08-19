@@ -19,7 +19,6 @@ import PrivateRoute from "./admin/routes/PrivateRoute";
 import AdminLayout from "./admin/layouts/AdminLayout";
 import AdminTicketType from "./admin/pages/AdminTicketType";
 
-// 👇 Matka Admin Pages
 import AdminMarkets from "./admin/pages/AdminMarkets";
 import AdminBids from "./admin/pages/AdminBids";
 import AdminResults from "./admin/pages/AdminResults";
@@ -29,31 +28,38 @@ import AdminCurrencyRates from "./admin/pages/AdminCurrencyRates";
 import AdminAustraliaGameCount from "./admin/pages/australia/AdminAustraliaGameCount";
 import AdminAustraliaGameEntries from "./admin/pages/australia/AdminAustraliaGameEntries";
 import AdminAustraliaPowerballResult from "./admin/pages/australia/AdminAustraliaPowerballResult";
+import AdminAustraliaPowerballDivision from "./admin/pages/australia/AustraliaPowerballDivisions";
 
 // Pakistan
 import AdminPakistanGameCount from "./admin/pages/pakistan/AdminPakistanGameCount";
 import AdminPakistanGameEntries from "./admin/pages/pakistan/AdminPakistanGameEntries";
 import AdminPakistanPowerballResult from "./admin/pages/pakistan/AdminPakistanPowerballResult";
+import AdminPakistanPowerballDivision from "./admin/pages/pakistan/PakistanPowerballDivisions";
 
 // Canada
 import AdminCanadaGameCount from "./admin/pages/canada/AdminCanadaGameCount";
 import AdminCanadaGameEntries from "./admin/pages/canada/AdminCanadaGameEntries";
 import AdminCanadaPowerballResult from "./admin/pages/canada/AdminCanadaPowerballResult";
+import AdminCanadaPowerballDivision from "./admin/pages/canada/CanadaPowerballDivisions";
 
 // India
 import AdminIndiaGameCount from "./admin/pages/india/AdminIndiaGameCount";
 import AdminIndiaGameEntries from "./admin/pages/india/AdminIndiaGameEntries";
 import AdminIndiaPowerballResult from "./admin/pages/india/AdminIndiaPowerballResult";
+import AdminIndiaPowerballDivision from "./admin/pages/india/IndiaPowerballDivisions";
 
 // Nepal
 import AdminNepalGameCount from "./admin/pages/nepal/AdminNepalGameCount";
 import AdminNepalGameEntries from "./admin/pages/nepal/AdminNepalGameEntries";
 import AdminNepalPowerballResult from "./admin/pages/nepal/AdminNepalPowerballResult";
+import AdminNepalPowerballDivision from "./admin/pages/nepal/NepalPowerballDivisions";
 
 // UAE
 import AdminUAEGameCount from "./admin/pages/uae/AdminUAEGameCount";
 import AdminUAEGameEntries from "./admin/pages/uae/AdminUAEGameEntries";
 import AdminUAEPowerballResult from "./admin/pages/uae/AdminUAEPowerballResult";
+import AdminUAEPowerballDivision from "./admin/pages/uae/UaePowerballDivisions";
+
 import ReferralLevels from "./admin/pages/ReferralLevels";
 import AdminBettingBonus from "./admin/pages/AdminBettingBonus";
 
@@ -76,109 +82,161 @@ function App() {
           <Route path="/admin/settings" element={<Settings />} />
           <Route path="/admin/ticketsetiings" element={<AdminTicketType />} />
 
-          {/* Deposit Settings */}
-          <Route path="/admin/deposit-settings" element={<DepositSettingsAdmin />} />
-
-          {/* Withdrawal Settings */}
-          <Route path="/admin/withdrawal-settings" element={<WithdrawalSettings />} />
-          <Route path="/admin/withdrawal-settings/create" element={<CreateWithdrawalSettings />} />
           <Route
-            path="/admin/currency-rates" element={<AdminCurrencyRates />
-            }
+            path="/admin/deposit-settings"
+            element={<DepositSettingsAdmin />}
           />
 
-          {/* Banner Management */}
+          <Route
+            path="/admin/withdrawal-settings"
+            element={<WithdrawalSettings />}
+          />
+
+          <Route
+            path="/admin/withdrawal-settings/create"
+            element={<CreateWithdrawalSettings />}
+          />
+
+          <Route
+            path="/admin/currency-rates"
+            element={<AdminCurrencyRates />}
+          />
+
           <Route path="/admin/banners" element={<Banners />} />
 
-          {/* ============================================================ */}
-          {/* 👇 MATKA ADMIN PAGES */}
-          {/* ============================================================ */}
-
-          {/* Manage Markets */}
           <Route path="/admin/markets" element={<AdminMarkets />} />
-
-          {/* View All Bids */}
           <Route path="/admin/bids" element={<AdminBids />} />
-
-          {/* Manage Results */}
           <Route path="/admin/results" element={<AdminResults />} />
 
-          {/* ============================================================ */}
-          {/* 👇 POWERBALL RESULT PAGES */}
-          {/* ============================================================ */}
+          {/* ================= POWERBALL RESULTS ================= */}
 
-          {/* Australia Powerball */}
           <Route
             path="/admin/australia/powerball-result"
             element={<AdminAustraliaPowerballResult />}
           />
 
-          {/* Pakistan Powerball */}
           <Route
             path="/admin/pakistan/powerball-result"
             element={<AdminPakistanPowerballResult />}
           />
 
-          {/* Canada Powerball */}
           <Route
             path="/admin/canada/powerball-result"
             element={<AdminCanadaPowerballResult />}
           />
 
-          {/* India Powerball */}
           <Route
             path="/admin/india/powerball-result"
             element={<AdminIndiaPowerballResult />}
           />
 
-          {/* Nepal Powerball */}
           <Route
             path="/admin/nepal/powerball-result"
             element={<AdminNepalPowerballResult />}
           />
 
-          {/* UAE Powerball */}
           <Route
             path="/admin/uae/powerball-result"
             element={<AdminUAEPowerballResult />}
           />
 
-          {/* ============================================================ */}
-          {/* 👇 GAME COUNT & ENTRIES PAGES */}
-          {/* ============================================================ */}
+          {/* ================= POWERBALL DIVISIONS ================= */}
 
-          {/* Australia */}
-          <Route path="/admin/australia/gamecounts" element={<AdminAustraliaGameCount />} />
-          <Route path="/admin/australia/gameEntries" element={<AdminAustraliaGameEntries />} />
+          <Route
+            path="/admin/australia/powerball-divisions"
+            element={<AdminAustraliaPowerballDivision />}
+          />
 
-          {/* Pakistan */}
-          <Route path="/admin/pakistan/gamecounts" element={<AdminPakistanGameCount />} />
-          <Route path="/admin/pakistan/gameEntries" element={<AdminPakistanGameEntries />} />
+          <Route
+            path="/admin/pakistan/powerball-divisions"
+            element={<AdminPakistanPowerballDivision />}
+          />
 
-          {/* Canada */}
-          <Route path="/admin/canada/gamecounts" element={<AdminCanadaGameCount />} />
-          <Route path="/admin/canada/gameEntries" element={<AdminCanadaGameEntries />} />
+          <Route
+            path="/admin/canada/powerball-divisions"
+            element={<AdminCanadaPowerballDivision />}
+          />
 
-          {/* India */}
-          <Route path="/admin/india/gamecounts" element={<AdminIndiaGameCount />} />
-          <Route path="/admin/india/gameEntries" element={<AdminIndiaGameEntries />} />
+          <Route
+            path="/admin/india/powerball-divisions"
+            element={<AdminIndiaPowerballDivision />}
+          />
 
-          {/* Nepal */}
-          <Route path="/admin/nepal/gamecounts" element={<AdminNepalGameCount />} />
-          <Route path="/admin/nepal/gameEntries" element={<AdminNepalGameEntries />} />
+          <Route
+            path="/admin/nepal/powerball-divisions"
+            element={<AdminNepalPowerballDivision />}
+          />
 
-          {/* UAE */}
-          <Route path="/admin/uae/gamecounts" element={<AdminUAEGameCount />} />
-          <Route path="/admin/uae/gameEntries" element={<AdminUAEGameEntries />} />
+          <Route
+            path="/admin/uae/powerball-divisions"
+            element={<AdminUAEPowerballDivision />}
+          />
+
+          {/* ================= GAME COUNTS & ENTRIES ================= */}
+
+          <Route
+            path="/admin/australia/gamecounts"
+            element={<AdminAustraliaGameCount />}
+          />
+          <Route
+            path="/admin/australia/gameEntries"
+            element={<AdminAustraliaGameEntries />}
+          />
+
+          <Route
+            path="/admin/pakistan/gamecounts"
+            element={<AdminPakistanGameCount />}
+          />
+          <Route
+            path="/admin/pakistan/gameEntries"
+            element={<AdminPakistanGameEntries />}
+          />
+
+          <Route
+            path="/admin/canada/gamecounts"
+            element={<AdminCanadaGameCount />}
+          />
+          <Route
+            path="/admin/canada/gameEntries"
+            element={<AdminCanadaGameEntries />}
+          />
+
+          <Route
+            path="/admin/india/gamecounts"
+            element={<AdminIndiaGameCount />}
+          />
+          <Route
+            path="/admin/india/gameEntries"
+            element={<AdminIndiaGameEntries />}
+          />
+
+          <Route
+            path="/admin/nepal/gamecounts"
+            element={<AdminNepalGameCount />}
+          />
+          <Route
+            path="/admin/nepal/gameEntries"
+            element={<AdminNepalGameEntries />}
+          />
+
+          <Route
+            path="/admin/uae/gamecounts"
+            element={<AdminUAEGameCount />}
+          />
+          <Route
+            path="/admin/uae/gameEntries"
+            element={<AdminUAEGameEntries />}
+          />
+
           <Route
             path="/admin/referral-levels"
             element={<ReferralLevels />}
           />
+
           <Route
             path="/admin/betting-bonus"
             element={<AdminBettingBonus />}
           />
-
         </Route>
       </Route>
     </Routes>

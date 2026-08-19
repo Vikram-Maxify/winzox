@@ -84,21 +84,27 @@ const Sidebar = ({ isOpen, onClose }) => {
       "/admin/australia/gamecounts",
       "/admin/australia/gameEntries",
       "/admin/australia/powerball-result",
+      "/admin/australia/powerball-divisions",
       "/admin/pakistan/gamecounts",
       "/admin/pakistan/gameEntries",
       "/admin/pakistan/powerball-result",
+      "/admin/pakistan/powerball-divisions",
       "/admin/canada/gamecounts",
       "/admin/canada/gameEntries",
       "/admin/canada/powerball-result",
+      "/admin/canada/powerball-divisions",
       "/admin/india/gamecounts",
       "/admin/india/gameEntries",
       "/admin/india/powerball-result",
+      "/admin/india/powerball-divisions",
       "/admin/nepal/gamecounts",
       "/admin/nepal/gameEntries",
       "/admin/nepal/powerball-result",
+      "/admin/nepal/powerball-divisions",
       "/admin/uae/gamecounts",
       "/admin/uae/gameEntries",
       "/admin/uae/powerball-result",
+      "/admin/uae/powerball-divisions",
     ];
     if (powerhitPaths.includes(location.pathname)) {
       setExpandedMenus(prev => ({ ...prev, powerhit: true }));
@@ -108,7 +114,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     const australiaPaths = [
       "/admin/australia/gamecounts",
       "/admin/australia/gameEntries",
-      "/admin/australia/powerball-result"
+      "/admin/australia/powerball-result",
+      "/admin/australia/powerball-divisions"
     ];
     if (australiaPaths.includes(location.pathname)) {
       setExpandedMenus(prev => ({ ...prev, australia: true, powerhit: true }));
@@ -117,7 +124,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     const pakistanPaths = [
       "/admin/pakistan/gamecounts",
       "/admin/pakistan/gameEntries",
-      "/admin/pakistan/powerball-result"
+      "/admin/pakistan/powerball-result",
+      "/admin/pakistan/powerball-divisions"
     ];
     if (pakistanPaths.includes(location.pathname)) {
       setExpandedMenus(prev => ({ ...prev, pakistan: true, powerhit: true }));
@@ -126,7 +134,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     const canadaPaths = [
       "/admin/canada/gamecounts",
       "/admin/canada/gameEntries",
-      "/admin/canada/powerball-result"
+      "/admin/canada/powerball-result",
+      "/admin/canada/powerball-divisions"
     ];
     if (canadaPaths.includes(location.pathname)) {
       setExpandedMenus(prev => ({ ...prev, canada: true, powerhit: true }));
@@ -135,7 +144,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     const indiaPaths = [
       "/admin/india/gamecounts",
       "/admin/india/gameEntries",
-      "/admin/india/powerball-result"
+      "/admin/india/powerball-result",
+      "/admin/india/powerball-divisions"
     ];
     if (indiaPaths.includes(location.pathname)) {
       setExpandedMenus(prev => ({ ...prev, india: true, powerhit: true }));
@@ -144,7 +154,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     const nepalPaths = [
       "/admin/nepal/gamecounts",
       "/admin/nepal/gameEntries",
-      "/admin/nepal/powerball-result"
+      "/admin/nepal/powerball-result",
+      "/admin/nepal/powerball-divisions"
     ];
     if (nepalPaths.includes(location.pathname)) {
       setExpandedMenus(prev => ({ ...prev, nepal: true, powerhit: true }));
@@ -153,7 +164,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     const uaePaths = [
       "/admin/uae/gamecounts",
       "/admin/uae/gameEntries",
-      "/admin/uae/powerball-result"
+      "/admin/uae/powerball-result",
+      "/admin/uae/powerball-divisions"
     ];
     if (uaePaths.includes(location.pathname)) {
       setExpandedMenus(prev => ({ ...prev, uae: true, powerhit: true }));
@@ -274,6 +286,11 @@ const Sidebar = ({ isOpen, onClose }) => {
               path: "/admin/australia/powerball-result",
               icon: <Trophy size={14} />,
             },
+            {
+              name: "Powerball Divisions",
+              path: "/admin/australia/powerball-divisions",
+              icon: <ListOrdered size={14} />,
+            },
           ],
         },
         // ✅ Pakistan
@@ -297,6 +314,11 @@ const Sidebar = ({ isOpen, onClose }) => {
               name: "Powerball Result",
               path: "/admin/pakistan/powerball-result",
               icon: <Trophy size={14} />,
+            },
+            {
+              name: "Powerball Divisions",
+              path: "/admin/pakistan/powerball-divisions",
+              icon: <ListOrdered size={14} />,
             },
           ],
         },
@@ -322,6 +344,11 @@ const Sidebar = ({ isOpen, onClose }) => {
               path: "/admin/canada/powerball-result",
               icon: <Trophy size={14} />,
             },
+            {
+              name: "Powerball Divisions",
+              path: "/admin/canada/powerball-divisions",
+              icon: <ListOrdered size={14} />,
+            },
           ],
         },
         // ✅ India
@@ -345,6 +372,11 @@ const Sidebar = ({ isOpen, onClose }) => {
               name: "Powerball Result",
               path: "/admin/india/powerball-result",
               icon: <Trophy size={14} />,
+            },
+            {
+              name: "Powerball Divisions",
+              path: "/admin/india/powerball-divisions",
+              icon: <ListOrdered size={14} />,
             },
           ],
         },
@@ -370,6 +402,11 @@ const Sidebar = ({ isOpen, onClose }) => {
               path: "/admin/nepal/powerball-result",
               icon: <Trophy size={14} />,
             },
+            {
+              name: "Powerball Divisions",
+              path: "/admin/nepal/powerball-divisions",
+              icon: <ListOrdered size={14} />,
+            },
           ],
         },
         // ✅ UAE
@@ -393,6 +430,11 @@ const Sidebar = ({ isOpen, onClose }) => {
               name: "Powerball Result",
               path: "/admin/uae/powerball-result",
               icon: <Trophy size={14} />,
+            },
+            {
+              name: "Powerball Divisions",
+              path: "/admin/uae/powerball-divisions",
+              icon: <ListOrdered size={14} />,
             },
           ],
         },
