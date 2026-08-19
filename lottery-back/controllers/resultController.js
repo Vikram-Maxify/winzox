@@ -22,22 +22,18 @@ const checkBidWin = (bidNumber, gameType, winningNumber) => {
       return winningNumStr === bidNumStr;
       
     case 'half-sangam':
-      // Half-Sangam: Check if either 1-digit or 3-digit matches
       return winningNumStr === bidNumStr || 
              winningNumStr.slice(-1) === bidNumStr.slice(-1);
              
     case 'full-sangam':
-      // Full-Sangam: Check last 2 digits
       return winningNumStr.slice(-2) === bidNumStr;
       
     case 'last-digit':
-      // Last Digit: Check if last digit matches
       const bidLastDigit = bidNumStr.slice(-1);
       const winningLastDigit = winningNumStr.slice(-1);
       return bidLastDigit === winningLastDigit;
       
     case 'first-digit':
-      // First Digit: Check if first digit matches
       const bidFirstDigit = bidNumStr.charAt(0);
       const winningFirstDigit = winningNumStr.charAt(0);
       return bidFirstDigit === winningFirstDigit;
@@ -47,6 +43,21 @@ const checkBidWin = (bidNumber, gameType, winningNumber) => {
   }
 };
 
+// Format winning number based on game type
+const formatWinningNumber = (winningNumber, gameType) => {
+  let formatted = String(winningNumber).trim();
+  
+  if (["jodi", "full-sangam", "last-digit", "first-digit"].includes(gameType)) {
+    formatted = formatted.padStart(2, "0");
+  } else if (gameType === "panna") {
+    formatted = formatted.padStart(3, "0");
+  } else if (gameType === "half-sangam" && formatted.length === 2) {
+    formatted = formatted.padStart(3, "0");
+  }
+  
+  return formatted;
+};
+
 // ============================================================
 // ================= DECLARE RESULT ===========================
 // ============================================================
@@ -54,8 +65,8 @@ const checkBidWin = (bidNumber, gameType, winningNumber) => {
 // Declare result (Admin Only)
 exports.declareResult = async (req, res) => {
   try {
-    const { marketId, winningNumber, resultDate } = req.body;
-    const adminId = req.user.id; // From protect middleware
+    const { marketId, winningNumber, resultDate, gameType } = req.body;
+    const adminId = req.user.id;
 
     // Validate required fields
     if (!marketId || !winningNumber) {
@@ -74,74 +85,180 @@ exports.declareResult = async (req, res) => {
       });
     }
 
-    if (market.isResultDeclared) {
+    // Get all pending bids by game type for this market
+    const pendingBidsByGameType = await Bid.aggregate([
+      {
+        $match: {
+          marketId: new mongoose.Types.ObjectId(marketId),
+          status: "pending"
+        }
+      },
+      {
+        $group: {
+          _id: "$gameType",
+          count: { $sum: 1 },
+          bids: { 
+            $push: {
+              _id: "$_id",
+              userId: "$userId",
+              number: "$number",
+              bidAmount: "$bidAmount",
+              possibleWinAmount: "$possibleWinAmount"
+            }
+          }
+        }
+      }
+    ]);
+
+    // Check if there are any pending bids
+    if (pendingBidsByGameType.length === 0) {
+      // Check if there are any bids at all
+      const totalBids = await Bid.countDocuments({ marketId: marketId });
+      
+      if (totalBids === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No bids found for this market. Please create bids first.",
+        });
+      }
+
+      // Check what statuses exist
+      const statuses = await Bid.aggregate([
+        {
+          $match: {
+            marketId: new mongoose.Types.ObjectId(marketId)
+          }
+        },
+        {
+          $group: {
+            _id: "$status",
+            count: { $sum: 1 },
+            gameTypes: { $addToSet: "$gameType" }
+          }
+        }
+      ]);
+
       return res.status(400).json({
         success: false,
-        message: "Result already declared for this market",
+        message: "No pending bids found. All bids are already processed.",
+        data: {
+          totalBids,
+          statuses,
+          marketGameTypes: market.gameTypes,
+        }
       });
     }
 
-    // Check if result already exists for this date
+    // Get available game types with pending bids
+    const availableGameTypes = pendingBidsByGameType.map(item => item._id);
+    
+    // Determine which game type to use
+    let selectedGameType = gameType;
+    
+    // If no game type specified or specified game type has no pending bids
+    if (!selectedGameType || !availableGameTypes.includes(selectedGameType)) {
+      // Use the first available game type with pending bids
+      selectedGameType = availableGameTypes[0];
+    }
+
+    // Verify game type is supported by market
+    if (!market.gameTypes.includes(selectedGameType)) {
+      return res.status(400).json({
+        success: false,
+        message: `Game type "${selectedGameType}" has pending bids but is not supported by this market.`,
+        marketGameTypes: market.gameTypes,
+        pendingGameTypes: availableGameTypes,
+      });
+    }
+
+    // Check if market already has result declared
+    if (market.isResultDeclared) {
+      // Check if all game types have results
+      const resultDateObj = new Date(resultDate || new Date());
+      const declaredResults = await Result.find({
+        marketId,
+        resultDate: resultDateObj,
+      });
+
+      if (declaredResults.length >= market.gameTypes.length) {
+        return res.status(400).json({
+          success: false,
+          message: "All results already declared for this market on this date.",
+        });
+      }
+    }
+
+    // Format winning number
+    const formattedWinningNumber = formatWinningNumber(winningNumber, selectedGameType);
+
     const resultDateObj = new Date(resultDate || new Date());
+
+    // Check if result already exists for this game type
     const existingResult = await Result.findOne({
       marketId,
       resultDate: resultDateObj,
+      gameType: selectedGameType,
     });
 
     if (existingResult) {
       return res.status(400).json({
         success: false,
-        message: "Result already declared for this date",
+        message: `Result already declared for ${selectedGameType} on ${resultDateObj.toDateString()}`,
       });
     }
 
-    // Get all pending bids for this market
-    const pendingBids = await Bid.find({
-      marketId: marketId,
-      status: "pending"
-    });
+    // Get pending bids for the selected game type
+    const pendingBidsForGameType = pendingBidsByGameType.find(
+      item => item._id === selectedGameType
+    );
 
-    if (pendingBids.length === 0) {
+    if (!pendingBidsForGameType || pendingBidsForGameType.bids.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "No pending bids found for this market",
+        message: `No pending bids found for game type: ${selectedGameType}`,
+        availableGameTypes,
       });
     }
 
-    // Process each bid based on game type
+    const pendingBids = pendingBidsForGameType.bids;
+
+    // Process each bid
     let totalPayout = 0;
     let totalWinningBids = 0;
     const winningBidsList = [];
     const losingBidsList = [];
-    const processedUsers = new Set();
 
-    for (const bid of pendingBids) {
-      const isWin = checkBidWin(bid.number, market.gameType, winningNumber);
+    for (const bidData of pendingBids) {
+      const isWin = checkBidWin(bidData.number, selectedGameType, formattedWinningNumber);
       
+      // Find the actual bid document to update
+      const bid = await Bid.findById(bidData._id);
+      
+      if (!bid) continue;
+
       if (isWin) {
-        // Bid is won
-        const winAmount = bid.possibleWinAmount || 0;
+        const winAmount = bidData.possibleWinAmount || 0;
         totalPayout += winAmount;
         totalWinningBids++;
         
         // Update user balance
-        const user = await User.findById(bid.userId);
+        const user = await User.findById(bidData.userId);
         if (user) {
-          user.balance += winAmount;
+          user.balance = (user.balance || 0) + winAmount;
           await user.save();
         }
 
         // Update bid
         bid.status = "won";
         bid.winAmount = winAmount;
-        bid.resultNumber = String(winningNumber).trim();
+        bid.resultNumber = formattedWinningNumber;
         await bid.save();
         
         winningBidsList.push(bid);
       } else {
-        // Bid is lost
+        // Update bid - lost
         bid.status = "lost";
-        bid.resultNumber = String(winningNumber).trim();
+        bid.resultNumber = formattedWinningNumber;
         await bid.save();
         losingBidsList.push(bid);
       }
@@ -151,8 +268,8 @@ exports.declareResult = async (req, res) => {
     const result = new Result({
       marketId,
       marketName: market.name,
-      gameType: market.gameType,
-      winningNumber: String(winningNumber).trim(),
+      gameType: selectedGameType,
+      winningNumber: formattedWinningNumber,
       resultDate: resultDateObj,
       declaredBy: adminId,
       totalBids: pendingBids.length,
@@ -163,13 +280,21 @@ exports.declareResult = async (req, res) => {
 
     await result.save();
 
-    // Update market
-    market.isResultDeclared = true;
-    await market.save();
+    // Check if all game types have results declared for this date
+    const allResults = await Result.find({
+      marketId,
+      resultDate: resultDateObj,
+    });
+
+    // If all game types have results, mark market as fully declared
+    if (allResults.length >= market.gameTypes.length) {
+      market.isResultDeclared = true;
+      await market.save();
+    }
 
     return res.status(200).json({
       success: true,
-      message: "Result declared successfully",
+      message: `Result declared successfully for ${selectedGameType}`,
       data: {
         result: {
           id: result._id,
@@ -196,6 +321,10 @@ exports.declareResult = async (req, res) => {
           number: bid.number,
           bidAmount: bid.bidAmount,
           winAmount: bid.winAmount,
+        })),
+        pendingBidsByGameType: pendingBidsByGameType.map(item => ({
+          gameType: item._id,
+          count: item.count,
         })),
       },
     });
@@ -226,7 +355,7 @@ exports.getResults = async (req, res) => {
     }
 
     const results = await Result.find(filter)
-      .populate("marketId", "name marketId gameType")
+      .populate("marketId", "name marketId gameTypes")
       .populate("declaredBy", "name email")
       .sort({ resultDate: -1 })
       .skip((parseInt(page) - 1) * parseInt(limit))
@@ -260,7 +389,7 @@ exports.getResultById = async (req, res) => {
     const { resultId } = req.params;
 
     const result = await Result.findById(resultId)
-      .populate("marketId", "name marketId gameType")
+      .populate("marketId", "name marketId gameTypes")
       .populate("declaredBy", "name email");
 
     if (!result) {
@@ -275,6 +404,7 @@ exports.getResultById = async (req, res) => {
       marketId: result.marketId,
       resultNumber: result.winningNumber,
       status: "won",
+      gameType: result.gameType,
     })
       .populate("userId", "name email mobile")
       .select("userId bidAmount winAmount number");
@@ -309,7 +439,7 @@ exports.getTodayResults = async (req, res) => {
     const results = await Result.find({
       resultDate: { $gte: today, $lt: tomorrow },
     })
-      .populate("marketId", "name marketId gameType")
+      .populate("marketId", "name marketId gameTypes")
       .sort({ resultDate: -1 });
 
     res.json({
