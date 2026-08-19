@@ -249,6 +249,8 @@ const GameSelection = () => {
     (state) => state.ticketType || {},
   );
 
+  console.log(ticketTypes, "ticket type h ye");
+
   // Get country-specific game counts from Redux
   const countryGameCountState = useSelector((state) => {
     if (!activeCountryConfig) {
