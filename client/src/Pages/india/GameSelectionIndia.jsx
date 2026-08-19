@@ -1,15 +1,4 @@
-// Countries data with flag URLs
-const countries = [
-  { name: "India", flag: "https://flagcdn.com/w80/in.png", code: "IN" },
-  { name: "Australia", flag: "https://flagcdn.com/w80/au.png", code: "AU" },
-  { name: "Canada", flag: "https://flagcdn.com/w80/ca.png", code: "CA" },
-  { name: "Pakistan", flag: "https://flagcdn.com/w80/pk.png", code: "PK" },
-  { name: "Bangladesh", flag: "https://flagcdn.com/w80/bd.png", code: "BD" },
-  { name: "Nepal", flag: "https://flagcdn.com/w80/np.png", code: "NP" },
-  { name: "Dubai", flag: "https://flagcdn.com/w80/ae.png", code: "UAE" },
-];
-
-// GameSelectionIndia.jsx - Country-specific Redux
+// GameSelectionIndia.jsx - Country-specific Redux (India)
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -46,6 +35,17 @@ import {
 } from "../redux/slices/india/gameEntrySlice";
 import { getUserTicketTypes } from "../redux/slices/ticketTypeSlice";
 
+// Countries data
+const countries = [
+  { name: "India", flag: "https://flagcdn.com/w80/in.png", code: "IN" },
+  { name: "Australia", flag: "https://flagcdn.com/w80/au.png", code: "AU" },
+  { name: "Canada", flag: "https://flagcdn.com/w80/ca.png", code: "CA" },
+  { name: "Pakistan", flag: "https://flagcdn.com/w80/pk.png", code: "PK" },
+  { name: "Bangladesh", flag: "https://flagcdn.com/w80/bd.png", code: "BD" },
+  { name: "Nepal", flag: "https://flagcdn.com/w80/np.png", code: "NP" },
+  { name: "Dubai", flag: "https://flagcdn.com/w80/ae.png", code: "UAE" },
+];
+
 // ===== CUSTOM MODAL COMPONENT =====
 const CustomModal = ({ isOpen, onClose, type, title, message, details }) => {
   if (!isOpen) return null;
@@ -60,18 +60,15 @@ const CustomModal = ({ isOpen, onClose, type, title, message, details }) => {
 
   return (
     <>
-      {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center animate-fadeIn"
         onClick={onClose}
       >
-        {/* Modal */}
         <div 
           className="relative w-full max-w-md mx-4 transform-gpu animate-scaleIn"
           onClick={(e) => e.stopPropagation()}
         >
           <div className={`bg-white rounded-3xl shadow-2xl overflow-hidden border-2 ${borderColor}`}>
-            {/* Gradient Header */}
             <div className={`bg-gradient-to-r ${bgGradient} p-6 text-center relative`}>
               <div className="absolute inset-0 opacity-10">
                 <div className="w-full h-full" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
@@ -86,7 +83,6 @@ const CustomModal = ({ isOpen, onClose, type, title, message, details }) => {
               </div>
             </div>
 
-            {/* Body */}
             <div className="p-6">
               <p className="text-gray-700 text-center text-lg font-medium">
                 {message}
@@ -100,7 +96,6 @@ const CustomModal = ({ isOpen, onClose, type, title, message, details }) => {
                 </div>
               )}
 
-              {/* Close Button */}
               <button
                 onClick={onClose}
                 className={`mt-6 w-full py-3.5 rounded-xl font-bold text-white transition-all duration-300 transform-gpu hover:scale-105 hover:shadow-xl ${isSuccess ? 'bg-gradient-to-r from-green-500 to-emerald-500' : 'bg-gradient-to-r from-red-500 to-rose-500'}`}
@@ -109,7 +104,6 @@ const CustomModal = ({ isOpen, onClose, type, title, message, details }) => {
               </button>
             </div>
 
-            {/* Close X button */}
             <button
               onClick={onClose}
               className="absolute top-4 right-4 text-white/80 hover:text-white bg-white/20 hover:bg-white/30 rounded-full p-2 transition-all duration-300 hover:scale-110"
@@ -153,6 +147,62 @@ const CustomModal = ({ isOpen, onClose, type, title, message, details }) => {
   );
 };
 
+// ===== TICKET INFO TOOLTIP =====
+const TicketInfoTooltip = ({ ticket }) => {
+  if (!ticket) return null;
+
+  return (
+    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 bg-gray-900 text-white text-xs rounded-xl p-4 shadow-2xl z-50 border border-gray-700">
+      <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-gray-900 rotate-45"></div>
+      <div className="space-y-1.5">
+        <p className="flex justify-between">
+          <span className="text-gray-400">ID:</span>
+          <span className="font-mono text-[10px]">{ticket._id}</span>
+        </p>
+        <p className="flex justify-between">
+          <span className="text-gray-400">Title:</span>
+          <span className="font-semibold">{ticket.title}</span>
+        </p>
+        {ticket.subTitle && (
+          <p className="flex justify-between">
+            <span className="text-gray-400">Subtitle:</span>
+            <span>{ticket.subTitle}</span>
+          </p>
+        )}
+        <p className="flex justify-between">
+          <span className="text-gray-400">Order:</span>
+          <span>{ticket.order}</span>
+        </p>
+        <p className="flex justify-between">
+          <span className="text-gray-400">Status:</span>
+          <span>{ticket.isActive ? "🟢 Active" : "🔴 Inactive"}</span>
+        </p>
+        <p className="flex justify-between">
+          <span className="text-gray-400">Game Types:</span>
+          <span>{ticket.gameTypes?.length || 0}</span>
+        </p>
+        {ticket.gameTypes && ticket.gameTypes.length > 0 && (
+          <div className="mt-1 pt-1 border-t border-gray-700">
+            <p className="text-gray-400 text-[10px] mb-0.5">Game Types:</p>
+            {ticket.gameTypes.map((gt, idx) => (
+              <div key={gt._id} className="flex justify-between text-[10px]">
+                <span>{gt.title}</span>
+                <span className="text-gray-500">
+                  {gt.isActive ? "✅" : "❌"} Order: {gt.order}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="flex justify-between text-[10px] text-gray-500 pt-1 border-t border-gray-700">
+          <span>Created: {new Date(ticket.createdAt).toLocaleDateString()}</span>
+          <span>Updated: {new Date(ticket.updatedAt).toLocaleDateString()}</span>
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const GameSelection = () => {
   const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
@@ -173,14 +223,11 @@ const GameSelection = () => {
     message: entryMessage,
   } = useSelector((state) => state.indiaGameEntry);
 
-  // Get user data from auth slice
   const { user } = useSelector((state) => state.auth || {});
   const userCountry = user?.country || null;
   
-  // Use URL country if available, otherwise use user's country
   const activeCountryName = urlCountry || "India";
   
-  // Get the country code from the name
   const getCountryCodeFromName = (countryName) => {
     if (!countryName) return null;
     const country = countries.find(c => 
@@ -189,7 +236,6 @@ const GameSelection = () => {
     return country?.code || null;
   };
 
-  // Get country object
   const getCountryObject = (countryName) => {
     if (!countryName) return null;
     return countries.find(c => 
@@ -197,12 +243,10 @@ const GameSelection = () => {
     );
   };
 
-  // Get country code - this will be sent to dispatch
   const activeCountryCode = useMemo(() => {
     return getCountryCodeFromName(activeCountryName);
   }, [activeCountryName]);
 
-  // Get full country object for display
   const activeCountryObject = useMemo(() => {
     return getCountryObject(activeCountryName);
   }, [activeCountryName]);
@@ -222,7 +266,6 @@ const GameSelection = () => {
   const [allGamesExpanded, setAllGamesExpanded] = useState(false);
   const [countryError, setCountryError] = useState(null);
   
-  // ===== MODAL STATE =====
   const [modal, setModal] = useState({
     isOpen: false,
     type: 'success',
@@ -240,9 +283,21 @@ const GameSelection = () => {
         id: gt._id,
         title: gt.title,
         description: gt.description || "",
+        order: gt.order,
+        isActive: gt.isActive,
+        fullObject: gt,
       }));
     }
-    return [{ id: "default", title: "Standard Game", description: "" }];
+    return [
+      {
+        id: "default",
+        title: "Standard Game",
+        description: "",
+        order: 0,
+        isActive: true,
+        fullObject: null,
+      },
+    ];
   }, [ticketTypes, activeTicket]);
 
   const filteredGameCounts = useMemo(() => {
@@ -283,6 +338,11 @@ const GameSelection = () => {
   const selectedGameTypeTitle = useMemo(() => {
     const gameType = availableGameTypes.find((g) => g.id === selectedGameType);
     return gameType?.title || "";
+  }, [availableGameTypes, selectedGameType]);
+
+  const selectedGameTypeOrder = useMemo(() => {
+    const gameType = availableGameTypes.find((g) => g.id === selectedGameType);
+    return gameType?.order;
   }, [availableGameTypes, selectedGameType]);
 
   const totalPrice = useMemo(() => {
@@ -327,6 +387,34 @@ const GameSelection = () => {
 
   // ========== EFFECTS ==========
 
+  // Debug: Log full ticket data
+  useEffect(() => {
+    if (ticketTypes.length > 0) {
+      console.log("📦 Full Ticket Types:", JSON.stringify(ticketTypes, null, 2));
+      ticketTypes.forEach((ticket) => {
+        console.log(`🎫 Ticket: ${ticket.title}`, {
+          id: ticket._id,
+          order: ticket.order,
+          isActive: ticket.isActive,
+          gameTypes: ticket.gameTypes?.map((gt) => ({
+            id: gt._id,
+            title: gt.title,
+            order: gt.order,
+            isActive: gt.isActive,
+            description: gt.description,
+          })),
+        });
+      });
+    }
+  }, [ticketTypes]);
+
+  // Debug: Log game counts
+  useEffect(() => {
+    if (gameCounts.length > 0) {
+      console.log("📊 Full Game Counts:", JSON.stringify(gameCounts, null, 2));
+    }
+  }, [gameCounts]);
+
   useEffect(() => {
     dispatch(getUserTicketTypes());
     dispatch(getGameCounts());
@@ -334,7 +422,6 @@ const GameSelection = () => {
 
   useEffect(() => {
     if (ticketTypes.length > 0 && !activeTicket) {
-      // If URL has country, try to auto-select matching ticket
       if (urlCountry) {
         const matchingTicket = ticketTypes.find(ticket => 
           ticket.title?.toLowerCase().includes(urlCountry.toLowerCase())
@@ -350,7 +437,6 @@ const GameSelection = () => {
     }
   }, [ticketTypes, activeTicket, urlCountry]);
 
-  // Reset when ticket changes
   useEffect(() => {
     setSelectedGameType(null);
     setSelectedGameCount(null);
@@ -361,19 +447,18 @@ const GameSelection = () => {
     setAllGamesExpanded(false);
   }, [activeTicket]);
 
-  // Show success modal when entry is created
   useEffect(() => {
     if (entrySuccess) {
       setShowSuccess(true);
+      const selectedTicket = ticketTypes.find((t) => t._id === activeTicket);
       setModal({
         isOpen: true,
         type: 'success',
         title: '🎉 Entry Created Successfully!',
         message: entryMessage || 'Your game entry has been added to cart successfully.',
-        details: `Ticket: ${activeTicketTitle} | ${selectedCount?.totalGames || 0} Games | ${selectionMode === 'quickpick' ? 'QuickPick' : 'Pick Your Numbers'} | Country: ${activeCountryName} (${activeCountryCode || 'N/A'})`
+        details: `Ticket: ${activeTicketTitle} (ID: ${selectedTicket?._id?.slice(-6) || 'N/A'}) | Order: ${selectedTicket?.order || 0} | ${selectedCount?.totalGames || 0} Games | ${selectionMode === 'quickpick' ? 'QuickPick' : 'Pick Your Numbers'} | Country: ${activeCountryName} (${activeCountryCode || 'N/A'})`
       });
       
-      // Auto close after 5 seconds
       const timer = setTimeout(() => {
         closeModal();
         dispatch(resetGameEntryState());
@@ -383,7 +468,6 @@ const GameSelection = () => {
     }
   }, [entrySuccess, dispatch]);
 
-  // Show error modal
   useEffect(() => {
     if (entryError) {
       const errorMessage = typeof entryError === 'string' 
@@ -402,7 +486,6 @@ const GameSelection = () => {
     }
   }, [entryError, activeCountryName, activeCountryCode]);
 
-  // Auto-select effects
   useEffect(() => {
     if (activeTicket && availableGameTypes.length > 0 && !selectedGameType) {
       setSelectedGameType(availableGameTypes[0].id);
@@ -605,7 +688,6 @@ const GameSelection = () => {
   // ========== HANDLE ADD TO CART ==========
 
   const handleAddToCart = async () => {
-    // Country Validation
     if (!activeCountryName) {
       setModal({
         isOpen: true,
@@ -631,7 +713,6 @@ const GameSelection = () => {
 
     const countryCode = countryObj.code;
 
-    // Validation
     if (!selectionMode) {
       setModal({
         isOpen: true,
@@ -767,17 +848,6 @@ const GameSelection = () => {
     return Sparkles;
   };
 
-  const getTicketGradient = (title) => {
-    const lower = title?.toLowerCase() || "";
-    if (lower.includes("platinum") || lower.includes("premium"))
-      return "from-amber-400 to-yellow-400";
-    if (lower.includes("vip")) return "from-orange-400 to-amber-400";
-    if (lower.includes("powerhit")) return "from-orange-500 to-yellow-500";
-    if (lower.includes("system")) return "from-amber-500 to-yellow-400";
-    if (lower.includes("syndicate")) return "from-yellow-400 to-orange-400";
-    return "from-amber-400 to-yellow-400";
-  };
-
   // ========== RENDER ==========
 
   if (ticketLoading || gameCountLoading) {
@@ -797,7 +867,6 @@ const GameSelection = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
-      {/* Custom Modal */}
       <CustomModal
         isOpen={modal.isOpen}
         onClose={closeModal}
@@ -807,7 +876,7 @@ const GameSelection = () => {
         details={modal.details}
       />
 
-      {/* Header - Amber/Orange/Yellow Theme */}
+      {/* Header */}
       <div className="relative overflow-hidden bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-400 shadow-xl">
         <div className="absolute inset-0 opacity-10">
           <div
@@ -851,7 +920,6 @@ const GameSelection = () => {
               )}
             </div>
 
-            {/* Country Display */}
             <div className="bg-white/20 backdrop-blur-md rounded-2xl px-5 py-3 border border-white/30 shadow-xl shadow-orange-500/20">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-white/30 flex items-center justify-center shadow-inner">
@@ -886,7 +954,6 @@ const GameSelection = () => {
         </div>
       </div>
 
-      {/* Toasts */}
       {showSuccess && (
         <div className="fixed top-4 right-4 z-50 max-w-sm w-full animate-slide-in">
           <div className="bg-white rounded-xl shadow-2xl border border-green-100 p-4 flex items-start gap-3">
@@ -912,7 +979,6 @@ const GameSelection = () => {
         </div>
       )}
 
-      {/* Country Warning */}
       {!activeCountryName && (
         <div className="max-w-7xl mx-auto px-6 mt-6">
           <div className="bg-gradient-to-r from-red-100 to-rose-100 border-2 border-red-300 rounded-2xl p-5 flex items-start gap-4 shadow-xl shadow-red-100">
@@ -986,6 +1052,12 @@ const GameSelection = () => {
                         Recommended
                       </div>
                     )}
+
+                    {/* Tooltip */}
+                    {hoveredTicket === ticket._id && (
+                      <TicketInfoTooltip ticket={ticket} />
+                    )}
+
                     <div className="flex flex-col items-center text-center gap-2 relative z-10">
                       <div className={`p-3 rounded-xl ${isActive ? 'bg-amber-100 shadow-lg shadow-amber-200' : 'bg-gray-100 group-hover:bg-amber-50'} transition-all duration-300`}>
                         <TicketIcon size={22} className={isActive ? "text-amber-600" : "text-gray-500"} />
@@ -999,6 +1071,15 @@ const GameSelection = () => {
                             {ticket.subTitle}
                           </p>
                         )}
+                        {/* Show order and active status */}
+                        <div className="flex items-center justify-center gap-1 mt-1">
+                          <span className="text-[8px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
+                            Order: {ticket.order}
+                          </span>
+                          <span className="text-[8px]">
+                            {ticket.isActive ? "🟢" : "🔴"}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     {isActive && (
@@ -1051,6 +1132,8 @@ const GameSelection = () => {
                 <option key={gameType.id} value={gameType.id}>
                   {gameType.title}
                   {gameType.description && ` - ${gameType.description}`}
+                  {gameType.order !== undefined && ` (Order: ${gameType.order})`}
+                  {gameType.isActive !== undefined && gameType.isActive && " ✅"}
                 </option>
               ))}
             </select>
@@ -1104,6 +1187,9 @@ const GameSelection = () => {
                 <option key={item._id} value={item._id}>
                   {item.totalGames} Games - ₹{item.price}
                   {item.label && ` (${item.label})`}
+                  {item.discount && ` - ${item.discount}% off`}
+                  {item.isActive !== undefined && !item.isActive && " (Inactive)"}
+                  {item.ticketType?._id && ` | Ticket: ${item.ticketType.title || item.ticketType}`}
                 </option>
               ))}
             </select>
@@ -1650,7 +1736,7 @@ const GameSelection = () => {
             <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-yellow-300/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
             
             <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-              <div>
+              <div className="w-full">
                 <p className="text-white/90 text-sm font-medium flex items-center gap-2">
                   <Ticket size={16} /> Selected Package
                 </p>
@@ -1660,6 +1746,85 @@ const GameSelection = () => {
                   </span>
                   <span className="text-white/80 text-sm">/ total</span>
                 </div>
+
+                {/* Full Details Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+                  {/* Ticket Details */}
+                  <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3">
+                    <p className="text-[10px] text-white/70">Ticket</p>
+                    <p className="font-bold text-sm truncate">
+                      {activeTicketTitle}
+                    </p>
+                    {ticketTypes.find((t) => t._id === activeTicket) && (
+                      <>
+                        <p className="text-[8px] font-mono text-white/50 truncate">
+                          ID: {ticketTypes.find((t) => t._id === activeTicket)?._id?.slice(-6) || 'N/A'}
+                        </p>
+                        <p className="text-[8px] text-white/50">
+                          Order: {ticketTypes.find((t) => t._id === activeTicket)?.order || 0}
+                          {" "}
+                          {ticketTypes.find((t) => t._id === activeTicket)?.isActive ? "🟢" : "🔴"}
+                        </p>
+                        <p className="text-[8px] text-white/50">
+                          Game Types: {ticketTypes.find((t) => t._id === activeTicket)?.gameTypes?.length || 0}
+                        </p>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Game Type Details */}
+                  <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3">
+                    <p className="text-[10px] text-white/70">Game Type</p>
+                    <p className="font-bold text-sm truncate">
+                      {selectedGameTypeTitle || 'Standard'}
+                    </p>
+                    {selectedGameTypeOrder !== undefined && (
+                      <p className="text-[8px] text-white/50">
+                        Order: {selectedGameTypeOrder}
+                      </p>
+                    )}
+                    {availableGameTypes.find((g) => g.id === selectedGameType)?.isActive !== undefined && (
+                      <p className="text-[8px] text-white/50">
+                        {availableGameTypes.find((g) => g.id === selectedGameType)?.isActive ? "✅ Active" : "❌ Inactive"}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Game Count Details */}
+                  <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3">
+                    <p className="text-[10px] text-white/70">Package</p>
+                    <p className="font-bold text-sm">{selectedCount.totalGames} Games</p>
+                    <p className="text-[8px] text-white/50">
+                      ₹{selectedCount.price} 
+                      {selectedCount.discount && ` (${selectedCount.discount}% off)`}
+                    </p>
+                    {selectedCount.label && (
+                      <p className="text-[8px] text-white/50">{selectedCount.label}</p>
+                    )}
+                  </div>
+
+                  {/* Mode Details */}
+                  <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3">
+                    <p className="text-[10px] text-white/70">Mode</p>
+                    <p className="font-bold text-sm capitalize">
+                      {selectionMode === 'quickpick' ? 'QuickPick' : 'Manual'}
+                    </p>
+                    <p className="text-[8px] text-white/50">
+                      {games.filter((g) => {
+                        if (selectionMode === 'quickpick') {
+                          return g.numbers?.length === 7 && g.powerball;
+                        }
+                        return g.selectedNumbers?.length === 7 && g.selectedPowerball;
+                      }).length}/{games.length} Complete
+                    </p>
+                    {autoPlay && (
+                      <p className="text-[8px] text-white/50">
+                        {drawCount} draws
+                      </p>
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex flex-wrap gap-3 mt-3">
                   <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
                     {selectedCount.totalGames} Games
