@@ -121,7 +121,6 @@ const bidSchema = new mongoose.Schema(
     transactionId: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
 

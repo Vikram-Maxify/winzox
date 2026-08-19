@@ -1,31 +1,73 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const User = require("../models/authmodel");
 const crypto = require("crypto");
+
+const User = require("../models/authmodel");
+const CurrencyRate = require("../models/CurrencyRate");
 
 const {
     sendResetPasswordOTP,
 } = require("../utils/mailer.js");
 
+const uploadToImgBB = require("../utils/uploadToImgBB");
 
-const generateToken = (id, name, email) => {
-    return jwt.sign({ id, name, email }, process.env.JWT_SECRET, {
-        expiresIn: "7d",
-    });
+
+// ======================================================
+// GENERATE TOKEN
+// ======================================================
+
+const generateToken = (id, name, email, role) => {
+    return jwt.sign(
+        {
+            id,
+            name,
+            email,
+            role,
+        },
+        process.env.JWT_SECRET,
+        {
+            expiresIn: "7d",
+        }
+    );
 };
+
+
+// ======================================================
+// GENERATE REFERRAL CODE
+// ======================================================
 
 const generateReferralCode = (name) => {
-    const random = crypto.randomBytes(3).toString("hex").toUpperCase();
-    return name.replace(/\s+/g, "").substring(0, 4).toUpperCase() + random;
+    const random = crypto
+        .randomBytes(3)
+        .toString("hex")
+        .toUpperCase();
+
+    return (
+        name
+            .replace(/\s+/g, "")
+            .substring(0, 4)
+            .toUpperCase() + random
+    );
 };
 
 
+// ======================================================
+// REGISTER
+// ======================================================
 
 const register = async (req, res) => {
     try {
-        let { name, email, mobile, password, country, referralCode } = req.body;
+        let {
+            name,
+            email,
+            mobile,
+            password,
+            country,
+            referralCode,
+        } = req.body;
 
         // ================= VALIDATION =================
+
         if (!name || !email || !mobile || !password) {
             return res.status(400).json({
                 success: false,
@@ -47,9 +89,12 @@ const register = async (req, res) => {
         if (password.length < 6) {
             return res.status(400).json({
                 success: false,
-                message: "Password must be at least 6 characters",
+                message:
+                    "Password must be at least 6 characters",
             });
         }
+
+        // ================= CHECK EXISTING USER =================
 
         const userExist = await User.findOne({
             $or: [
@@ -76,11 +121,18 @@ const register = async (req, res) => {
             });
         }
 
-        // ================= VALIDATE REFERRAL CODE =================
+        // ================= REFERRAL =================
+
         let referrerUser = null;
+
         if (referralCode) {
-            referralCode = referralCode.trim().toUpperCase();
-            referrerUser = await User.findOne({ referralCode });
+            referralCode = referralCode
+                .trim()
+                .toUpperCase();
+
+            referrerUser = await User.findOne({
+                referralCode,
+            });
 
             if (!referrerUser) {
                 return res.status(400).json({
@@ -89,61 +141,95 @@ const register = async (req, res) => {
                 });
             }
 
-            // Check if referrer is blocked
             if (referrerUser.status === "blocked") {
                 return res.status(403).json({
                     success: false,
-                    message: "Referrer account is blocked",
+                    message:
+                        "Referrer account is blocked",
                 });
             }
         }
 
         // ================= HASH PASSWORD =================
-        const hashedPassword = await bcrypt.hash(password, 10);
 
-        // ================= GENERATE REFERRAL CODE =================
-        const newReferralCode = generateReferralCode(name);
+        const hashedPassword = await bcrypt.hash(
+            password,
+            10
+        );
+
+        // ================= REFERRAL CODE =================
+
+        const newReferralCode =
+            generateReferralCode(name);
 
         // ================= CREATE USER =================
+
         const user = await User.create({
-            name: name,
-            email: email,
-            mobile: mobile,
+            name,
+            email,
+            mobile,
             password: hashedPassword,
-            plainPassword: password,
+
+            // Keep only if you intentionally use it.
+            // plainPassword: password,
+
             role: "user",
-            country: country,
+            country: country || null,
+
             referralCode: newReferralCode,
-            referredBy: referralCode || null,
-            referredByUser: referrerUser ? referrerUser._id : null,
+
+            referredBy:
+                referralCode || null,
+
+            referredByUser:
+                referrerUser
+                    ? referrerUser._id
+                    : null,
         });
 
-        // ================= UPDATE REFERRER STATS =================
+        // ================= REFERRER STATS =================
+
         if (referrerUser) {
-            await User.findByIdAndUpdate(referrerUser._id, {
-                $inc: {
-                    totalReferrals: 1,
-                    referralEarning: 50,
+            await User.findByIdAndUpdate(
+                referrerUser._id,
+                {
+                    $inc: {
+                        totalReferrals: 1,
+                        referralEarning: 50,
+                    },
                 }
-            });
+            );
         }
 
-        // ================= GENERATE TOKEN =================
-        const token = generateToken(user._id, user.name, user.email);
+        // ================= TOKEN =================
 
-        // ================= SET COOKIE =================
+        const token = generateToken(
+            user._id,
+            user.name,
+            user.email,
+            user.role
+        );
+
+        // ================= COOKIE =================
+
         res.cookie("token", token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure:
+                process.env.NODE_ENV === "production",
             sameSite: "strict",
-            maxAge: 7 * 24 * 60 * 60 * 1000,
+            maxAge:
+                7 * 24 * 60 * 60 * 1000,
         });
 
         // ================= REMOVE PASSWORD =================
+
         const userObj = user.toObject();
+
         delete userObj.password;
+        delete userObj.plainPassword;
 
         // ================= RESPONSE =================
+
         return res.status(201).json({
             success: true,
             message: "Registration successful",
@@ -152,19 +238,25 @@ const register = async (req, res) => {
         });
 
     } catch (error) {
-        // Duplicate Key Error
         if (error.code === 11000) {
-            const field = Object.keys(error.keyPattern)[0];
+            const field =
+                Object.keys(error.keyPattern)[0];
+
             let message = "Duplicate field";
 
             if (field === "name") {
                 message = "Username already taken";
             } else if (field === "email") {
-                message = "Email already registered";
+                message =
+                    "Email already registered";
             } else if (field === "mobile") {
-                message = "Mobile already registered";
-            } else if (field === "referralCode") {
-                message = "Referral code already exists";
+                message =
+                    "Mobile number already registered";
+            } else if (
+                field === "referralCode"
+            ) {
+                message =
+                    "Referral code already exists";
             }
 
             return res.status(400).json({
@@ -173,13 +265,20 @@ const register = async (req, res) => {
             });
         }
 
-        console.error("REGISTER ERROR:", error);
+        console.error(
+            "REGISTER ERROR:",
+            error
+        );
+
         return res.status(500).json({
             success: false,
-            message: error.message || "Internal Server Error",
+            message:
+                error.message ||
+                "Internal Server Error",
         });
     }
 };
+
 
 // ======================================================
 // LOGIN
@@ -187,23 +286,24 @@ const register = async (req, res) => {
 
 const login = async (req, res) => {
     try {
-        let { mobile, password } = req.body;
+        let {
+            mobile,
+            password,
+        } = req.body;
 
-        console.log(req.body)
-
-        // ================= VALIDATION =================
         if (!mobile || !password) {
             return res.status(400).json({
                 success: false,
-                message: "Mobile and password are required",
+                message:
+                    "Mobile and password are required",
             });
         }
 
-        // ================= NORMALIZE =================
         mobile = mobile.trim();
 
-        // ================= FIND USER =================
-        const user = await User.findOne({ mobile }).select("+password");
+        const user = await User.findOne({
+            mobile,
+        }).select("+password");
 
         if (!user) {
             return res.status(404).json({
@@ -212,49 +312,53 @@ const login = async (req, res) => {
             });
         }
 
-        // ================= BLOCK CHECK =================
         if (user.status === "blocked") {
             return res.status(403).json({
                 success: false,
-                message: "Your account has been blocked",
+                message:
+                    "Your account has been blocked",
             });
         }
 
-        // ================= PASSWORD CHECK =================
-        const isMatch = await bcrypt.compare(password, user.password);
+        const isMatch = await bcrypt.compare(
+            password,
+            user.password
+        );
 
         if (!isMatch) {
             return res.status(400).json({
                 success: false,
-                message: "Invalid mobile or password",
+                message:
+                    "Invalid mobile or password",
             });
         }
 
-        // ================= GENERATE TOKEN =================
         const token = generateToken(
             user._id,
             user.name,
-            user.mobile,
+            user.email,
             user.role
         );
 
-        // Cookie Name
         const cookieName =
-            user.role === "admin" ? "adminToken" : "token";
+            user.role === "admin"
+                ? "adminToken"
+                : "token";
 
-        // ================= SET COOKIE =================
         res.cookie(cookieName, token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure:
+                process.env.NODE_ENV === "production",
             sameSite: "strict",
-            maxAge: 7 * 24 * 60 * 60 * 1000,
+            maxAge:
+                7 * 24 * 60 * 60 * 1000,
         });
 
-        // ================= REMOVE PASSWORD =================
         const userObj = user.toObject();
-        delete userObj.password;
 
-        // ================= RESPONSE =================
+        delete userObj.password;
+        delete userObj.plainPassword;
+
         return res.status(200).json({
             success: true,
             message: `${user.role} login successful`,
@@ -264,14 +368,20 @@ const login = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("LOGIN ERROR:", error);
+        console.error(
+            "LOGIN ERROR:",
+            error
+        );
 
         return res.status(500).json({
             success: false,
-            message: error.message || "Internal Server Error",
+            message:
+                error.message ||
+                "Internal Server Error",
         });
     }
 };
+
 
 // ======================================================
 // GET PROFILE
@@ -279,8 +389,10 @@ const login = async (req, res) => {
 
 const getProfile = async (req, res) => {
     try {
-        const user = await User.findById(req.user.id)
-            .select("-password")
+        const user = await User.findById(
+            req.user.id
+        )
+            .select("-password -plainPassword")
             .lean();
 
         if (!user) {
@@ -290,41 +402,50 @@ const getProfile = async (req, res) => {
             });
         }
 
-        // ==========================
-        // Currency Conversion using CurrencyRate Model
-        // ==========================
-        const CurrencyRate = require('../models/CurrencyRate');
+        // ================= CURRENCY =================
 
-        let balanceInLocalCurrency = user.balance; // Default in INR
+        let balanceInLocalCurrency =
+            user.balance;
+
         let conversionRate = 1;
-        let currencyCode = 'INR';
-        let countryCode = user.country || 'IN';
+        let currencyCode = "INR";
+        let countryCode =
+            user.country || "IN";
 
-        // Fetch currency rate from database
-        if (countryCode) {
-            const currencyRate = await CurrencyRate.findOne({
-                countryCode: countryCode,
-                status: true
+        const currencyRate =
+            await CurrencyRate.findOne({
+                countryCode,
+                status: true,
             }).lean();
 
-            if (currencyRate) {
-                conversionRate = Number(currencyRate.rate);
-                currencyCode = currencyRate.currencyCode;
-                // Convert INR balance to local currency
-                balanceInLocalCurrency = user.balance / conversionRate;
-            }
+        if (currencyRate) {
+            conversionRate =
+                Number(currencyRate.rate);
+
+            currencyCode =
+                currencyRate.currencyCode;
+
+            balanceInLocalCurrency =
+                user.balance /
+                conversionRate;
         }
 
-        // Prepare response with converted balance
         const userResponse = {
             ...user,
+
             balance: {
                 inr: user.balance,
-                local: parseFloat(balanceInLocalCurrency.toFixed(2)),
-                currencyCode: currencyCode,
-                conversionRate: conversionRate,
-                countryCode: countryCode
-            }
+
+                local: parseFloat(
+                    balanceInLocalCurrency.toFixed(2)
+                ),
+
+                currencyCode,
+
+                conversionRate,
+
+                countryCode,
+            },
         };
 
         return res.status(200).json({
@@ -333,13 +454,20 @@ const getProfile = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("GET PROFILE ERROR:", error);
+        console.error(
+            "GET PROFILE ERROR:",
+            error
+        );
+
         return res.status(500).json({
             success: false,
-            message: error.message || "Internal Server Error",
+            message:
+                error.message ||
+                "Internal Server Error",
         });
     }
 };
+
 
 // ======================================================
 // UPDATE PROFILE
@@ -347,11 +475,13 @@ const getProfile = async (req, res) => {
 
 const updateProfile = async (req, res) => {
     try {
+        console.log("REQ.FILE:", req.file);
+        console.log("REQ.BODY:", req.body);
+
         const userId = req.user.id;
 
         const {
             fullName,
-            username,
             email,
             mobile,
             city,
@@ -359,115 +489,54 @@ const updateProfile = async (req, res) => {
 
         const updateData = {};
 
-        // ================= FULL NAME =================
         if (fullName !== undefined) {
-            updateData.name = fullName.trim();
+            updateData.name = fullName.trim().toLowerCase();
         }
 
-        // ================= USERNAME =================
-        if (username !== undefined) {
-            const normalizedUsername = username.trim().toLowerCase();
-
-            if (normalizedUsername.length < 3) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Username must be at least 3 characters",
-                });
-            }
-
-            const existingUsername = await User.findOne({
-                username: normalizedUsername,
-                _id: { $ne: userId },
-            });
-
-            if (existingUsername) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Username already taken",
-                });
-            }
-
-            updateData.username = normalizedUsername;
-        }
-
-        // ================= EMAIL =================
         if (email !== undefined) {
-            const normalizedEmail = email.trim().toLowerCase();
-
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-            if (!emailRegex.test(normalizedEmail)) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Please enter a valid email address",
-                });
-            }
-
-            const existingEmail = await User.findOne({
-                email: normalizedEmail,
-                _id: { $ne: userId },
-            });
-
-            if (existingEmail) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Email already registered",
-                });
-            }
-
-            updateData.email = normalizedEmail;
+            updateData.email = email.trim().toLowerCase();
         }
 
-        // ================= MOBILE =================
         if (mobile !== undefined) {
-            const normalizedMobile = mobile.replace(/\D/g, "");
-
-            if (!/^[0-9]{10}$/.test(normalizedMobile)) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Please enter a valid 10-digit mobile number",
-                });
-            }
-
-            const existingMobile = await User.findOne({
-                mobile: normalizedMobile,
-                _id: { $ne: userId },
-            });
-
-            if (existingMobile) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Mobile number already registered",
-                });
-            }
-
-            updateData.mobile = normalizedMobile;
+            updateData.mobile = mobile
+                .replace(/\D/g, "");
         }
 
-        // ================= CITY =================
         if (city !== undefined) {
             updateData.city = city.trim();
         }
 
-        // ================= NOTHING TO UPDATE =================
-        if (Object.keys(updateData).length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: "No fields provided to update",
-            });
+        // ==========================================
+        // PROFILE IMAGE
+        // ==========================================
+
+        if (req.file) {
+            console.log("Uploading profile image...");
+
+            updateData.profilePic =
+                await uploadToImgBB(req.file);
+
+            console.log(
+                "IMGBB URL:",
+                updateData.profilePic
+            );
         }
 
-        updateData.updatedAt = new Date();
+        // ==========================================
+        // UPDATE USER
+        // ==========================================
 
-        // ================= UPDATE =================
-        const updatedUser = await User.findByIdAndUpdate(
-            userId,
-            { $set: updateData },
-            {
-                new: true,
-                runValidators: true,
-            }
-        ).select("-password");
+        const updatedUser =
+            await User.findByIdAndUpdate(
+                userId,
+                {
+                    $set: updateData,
+                },
+                {
+                    new: true,
+                    runValidators: true,
+                }
+            ).select("-password -plainPassword");
 
         if (!updatedUser) {
             return res.status(404).json({
@@ -478,38 +547,28 @@ const updateProfile = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            message: "Profile updated successfully",
+            message: req.file
+                ? "Profile and image updated successfully"
+                : "Profile updated successfully",
             user: updatedUser,
         });
 
     } catch (error) {
-        console.error("UPDATE PROFILE ERROR:", error);
-
-        if (error.code === 11000) {
-            const field = Object.keys(error.keyPattern)[0];
-
-            let message = "Duplicate field";
-
-            if (field === "username") {
-                message = "Username already taken";
-            } else if (field === "email") {
-                message = "Email already registered";
-            } else if (field === "mobile") {
-                message = "Mobile number already registered";
-            }
-
-            return res.status(400).json({
-                success: false,
-                message,
-            });
-        }
+        console.error(
+            "UPDATE PROFILE ERROR:",
+            error
+        );
 
         return res.status(500).json({
             success: false,
-            message: error.message || "Internal Server Error",
+            message:
+                error.message ||
+                "Internal Server Error",
         });
     }
 };
+
+
 // ======================================================
 // LOGOUT
 // ======================================================
@@ -518,7 +577,16 @@ const logout = async (req, res) => {
     try {
         res.cookie("token", "", {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure:
+                process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            expires: new Date(0),
+        });
+
+        res.cookie("adminToken", "", {
+            httpOnly: true,
+            secure:
+                process.env.NODE_ENV === "production",
             sameSite: "strict",
             expires: new Date(0),
         });
@@ -529,23 +597,29 @@ const logout = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("LOGOUT ERROR:", error);
+        console.error(
+            "LOGOUT ERROR:",
+            error
+        );
+
         return res.status(500).json({
             success: false,
-            message: error.message || "Internal Server Error",
+            message:
+                error.message ||
+                "Internal Server Error",
         });
     }
 };
 
+
 // ======================================================
-// FORGOT PASSWORD (WITH OTP)
+// FORGOT PASSWORD
 // ======================================================
 
 const forgotPassword = async (req, res) => {
     try {
         let { email } = req.body;
 
-        // ================= VALIDATION =================
         if (!email) {
             return res.status(400).json({
                 success: false,
@@ -553,11 +627,11 @@ const forgotPassword = async (req, res) => {
             });
         }
 
-        // ================= NORMALIZE =================
         email = email.trim().toLowerCase();
 
-        // ================= FIND USER =================
-        const user = await User.findOne({ email });
+        const user = await User.findOne({
+            email,
+        });
 
         if (!user) {
             return res.status(404).json({
@@ -566,77 +640,108 @@ const forgotPassword = async (req, res) => {
             });
         }
 
-        // ================= CHECK BLOCKED =================
         if (user.status === "blocked") {
             return res.status(403).json({
                 success: false,
-                message: "Your account has been blocked",
+                message:
+                    "Your account has been blocked",
             });
         }
 
-        // ================= GENERATE OTP =================
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = Math.floor(
+            100000 +
+            Math.random() * 900000
+        ).toString();
 
-        // ================= SAVE OTP =================
         user.reset_otp = otp;
-        user.reset_otp_expiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+        user.reset_otp_expiry =
+            new Date(
+                Date.now() +
+                5 * 60 * 1000
+            );
 
         await user.save();
 
-        // ================= SEND EMAIL =================
-        const isSent = await sendResetPasswordOTP(user.email, otp);
+        const isSent =
+            await sendResetPasswordOTP(
+                user.email,
+                otp
+            );
 
         if (!isSent) {
             return res.status(500).json({
                 success: false,
-                message: "Failed to send OTP",
+                message:
+                    "Failed to send OTP",
             });
         }
 
-        // ================= RESPONSE =================
         return res.status(200).json({
             success: true,
-            message: "OTP sent successfully to your email",
+            message:
+                "OTP sent successfully to your email",
         });
 
     } catch (error) {
-        console.error("FORGOT PASSWORD ERROR:", error);
+        console.error(
+            "FORGOT PASSWORD ERROR:",
+            error
+        );
+
         return res.status(500).json({
             success: false,
-            message: error.message || "Internal Server Error",
+            message:
+                error.message ||
+                "Internal Server Error",
         });
     }
 };
+
 
 // ======================================================
 // VERIFY OTP & RESET PASSWORD
 // ======================================================
 
-const verifyOTPAndReset = async (req, res) => {
+const verifyOTPAndReset = async (
+    req,
+    res
+) => {
     try {
-        let { email, otp, newPassword } = req.body;
+        let {
+            email,
+            otp,
+            newPassword,
+        } = req.body;
 
-        // ================= VALIDATION =================
-        if (!email || !otp || !newPassword) {
+        if (
+            !email ||
+            !otp ||
+            !newPassword
+        ) {
             return res.status(400).json({
                 success: false,
-                message: "Email, OTP and new password are required",
+                message:
+                    "Email, OTP and new password are required",
             });
         }
 
-        // ================= NORMALIZE =================
-        email = email.trim().toLowerCase();
+        email = email
+            .trim()
+            .toLowerCase();
 
-        // ================= PASSWORD LENGTH =================
         if (newPassword.length < 6) {
             return res.status(400).json({
                 success: false,
-                message: "Password must be at least 6 characters",
+                message:
+                    "Password must be at least 6 characters",
             });
         }
 
-        // ================= FIND USER =================
-        const user = await User.findOne({ email }).select("+password");
+        const user =
+            await User.findOne({
+                email,
+            }).select("+password");
 
         if (!user) {
             return res.status(404).json({
@@ -645,129 +750,113 @@ const verifyOTPAndReset = async (req, res) => {
             });
         }
 
-        // ================= ACCOUNT STATUS =================
         if (user.status === "blocked") {
             return res.status(403).json({
                 success: false,
-                message: "Your account has been blocked",
+                message:
+                    "Your account has been blocked",
             });
         }
 
-        // ================= OTP CHECK =================
-        if (!user.reset_otp || user.reset_otp !== otp.toString()) {
+        if (
+            !user.reset_otp ||
+            user.reset_otp !==
+            otp.toString()
+        ) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid OTP",
             });
         }
 
-        // ================= OTP EXPIRY =================
-        if (!user.reset_otp_expiry || new Date() > new Date(user.reset_otp_expiry)) {
+        if (
+            !user.reset_otp_expiry ||
+            new Date() >
+            new Date(
+                user.reset_otp_expiry
+            )
+        ) {
             return res.status(400).json({
                 success: false,
-                message: "OTP has expired",
+                message:
+                    "OTP has expired",
             });
         }
 
-        // ================= HASH PASSWORD =================
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password =
+            await bcrypt.hash(
+                newPassword,
+                10
+            );
 
-        // ================= UPDATE PASSWORD =================
-        user.password = hashedPassword;
+        // Agar plainPassword intentionally use kar rahe ho
+        // to ye line rakh sakte ho:
         user.plainPassword = newPassword;
 
-        // ================= CLEAR OTP =================
         user.reset_otp = null;
         user.reset_otp_expiry = null;
 
         await user.save();
 
-        // ================= RESPONSE =================
         return res.status(200).json({
             success: true,
-            message: "Password reset successfully",
+            message:
+                "Password reset successfully",
         });
 
     } catch (error) {
-        console.error("RESET PASSWORD ERROR:", error);
+        console.error(
+            "RESET PASSWORD ERROR:",
+            error
+        );
+
         return res.status(500).json({
             success: false,
-            message: error.message || "Internal Server Error",
+            message:
+                error.message ||
+                "Internal Server Error",
         });
     }
 };
+
 
 // ======================================================
 // CHANGE PASSWORD
 // ======================================================
 
-const changePassword = async (req, res) => {
+const changePassword = async (
+    req,
+    res
+) => {
     try {
-        const { oldPassword, newPassword } = req.body;
+        const {
+            oldPassword,
+            newPassword,
+        } = req.body;
 
-        if (!oldPassword || !newPassword) {
-            return res.status(400).json({
-                message: "Both passwords required",
-            });
-        }
-
-        const user = await User.findById(req.user.id).select("+password");
-        if (!user)
-            return res.status(404).json({ message: "User not found" });
-
-        const isMatch = await bcrypt.compare(oldPassword, user.password);
-        if (!isMatch)
-            return res.status(400).json({ message: "Old password incorrect" });
-
-        user.password = await bcrypt.hash(newPassword, 10);
-        await user.save();
-
-        res.status(200).json({
-            success: true,
-            message: "Password changed successfully",
-        });
-    } catch (err) {
-        console.error("CHANGE PASSWORD ERROR:", err);
-        res.status(500).json({ message: "Server error" });
-    }
-};
-
-
-const getAllUsers = async (req, res) => {
-    try {
-        const users = await User.find({})
-            .select("-password -plainPassword")
-            .sort({ createdAt: -1 });
-
-        return res.status(200).json({
-            success: true,
-            count: users.length,
-            users,
-        });
-    } catch (error) {
-        console.error("Get All Users Error:", error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Failed to fetch users.",
-            error: error.message,
-        });
-    }
-};
-
-const updateUserStatus = async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const { status } = req.body;
-
-        if (!["active", "blocked"].includes(status)) {
+        if (
+            !oldPassword ||
+            !newPassword
+        ) {
             return res.status(400).json({
                 success: false,
-                message: "Status must be active or blocked",
+                message:
+                    "Both passwords required",
             });
         }
 
-        const user = await User.findById(userId);
+        if (newPassword.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "New password must be at least 6 characters",
+            });
+        }
+
+        const user =
+            await User.findById(
+                req.user.id
+            ).select("+password");
 
         if (!user) {
             return res.status(404).json({
@@ -776,22 +865,158 @@ const updateUserStatus = async (req, res) => {
             });
         }
 
-        user.status = status;
+        const isMatch =
+            await bcrypt.compare(
+                oldPassword,
+                user.password
+            );
+
+        if (!isMatch) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Old password incorrect",
+            });
+        }
+
+        user.password =
+            await bcrypt.hash(
+                newPassword,
+                10
+            );
+
         await user.save();
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
-            message: `User ${status} successfully`,
-            user,
+            message:
+                "Password changed successfully",
         });
+
     } catch (error) {
-        console.error(error);
-        res.status(500).json({
+        console.error(
+            "CHANGE PASSWORD ERROR:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+        });
+    }
+};
+
+
+// ======================================================
+// GET ALL USERS
+// ======================================================
+
+const getAllUsers = async (
+    req,
+    res
+) => {
+    try {
+        const users =
+            await User.find({})
+                .select(
+                    "-password -plainPassword"
+                )
+                .sort({
+                    createdAt: -1,
+                });
+
+        return res.status(200).json({
+            success: true,
+            count: users.length,
+            users,
+        });
+
+    } catch (error) {
+        console.error(
+            "GET ALL USERS ERROR:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message:
+                "Failed to fetch users.",
+            error: error.message,
+        });
+    }
+};
+
+
+// ======================================================
+// UPDATE USER STATUS
+// ======================================================
+
+const updateUserStatus = async (
+    req,
+    res
+) => {
+    try {
+        const { userId } =
+            req.params;
+
+        const { status } =
+            req.body;
+
+        if (
+            !["active", "blocked"].includes(
+                status
+            )
+        ) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Status must be active or blocked",
+            });
+        }
+
+        const user =
+            await User.findById(
+                userId
+            );
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message:
+                    "User not found",
+            });
+        }
+
+        user.status = status;
+
+        await user.save();
+
+        const userResponse =
+            user.toObject();
+
+        delete userResponse.password;
+        delete userResponse.plainPassword;
+
+        return res.status(200).json({
+            success: true,
+            message:
+                `User ${status} successfully`,
+            user: userResponse,
+        });
+
+    } catch (error) {
+        console.error(
+            "UPDATE USER STATUS ERROR:",
+            error
+        );
+
+        return res.status(500).json({
             success: false,
             message: error.message,
         });
     }
 };
+
 
 // ======================================================
 // EXPORTS
@@ -801,11 +1026,11 @@ module.exports = {
     register,
     login,
     getProfile,
-    updateProfile,  // <-- Added updateProfile
+    updateProfile,
     logout,
     forgotPassword,
     verifyOTPAndReset,
     changePassword,
     getAllUsers,
-    updateUserStatus
+    updateUserStatus,
 };

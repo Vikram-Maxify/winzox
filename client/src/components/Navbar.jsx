@@ -174,6 +174,17 @@ const Navbar = ({ children }) => {
     return getUserDisplayName().charAt(0).toUpperCase();
   };
 
+  const getAvatar = () => {
+    const name = getUserDisplayName();
+
+    return (
+      user?.profilePic ||
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+        name
+      )}&background=FBBF24&color=fff&size=128`
+    );
+  };
+
   const getAvatarGradient = () => {
     const gradients = [
       "from-yellow-400 to-orange-500",
@@ -440,11 +451,17 @@ const Navbar = ({ children }) => {
                     to="/account"
                     className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl text-black hover:shadow-2xl transition-all duration-500"
                   >
-                    <div
-                      className={`w-7 h-7 rounded-full bg-gradient-to-r ${getAvatarGradient()} flex items-center justify-center text-white text-xs font-bold shadow-lg transform-gpu hover:scale-110 transition-all duration-300`}
-                    >
-                      {getInitial()}
-                    </div>
+                    <img
+                      src={getAvatar()}
+                      alt={getUserDisplayName()}
+                      className="w-7 h-7 rounded-full object-cover border-2 border-yellow-400 shadow-lg transform-gpu hover:scale-110 transition-all duration-300"
+                      onError={(e) => {
+                        e.currentTarget.src =
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                            getUserDisplayName()
+                          )}&background=FBBF24&color=fff&size=128`;
+                      }}
+                    />
                     <span className="text-sm font-bold">
                       {getUserDisplayName()}
                     </span>
@@ -452,11 +469,17 @@ const Navbar = ({ children }) => {
 
                   {/* Mobile Avatar only */}
                   <Link to="/account" className="md:hidden flex items-center">
-                    <div
-                      className={`w-8 h-8 rounded-full bg-gradient-to-r ${getAvatarGradient()} flex items-center justify-center text-white text-xs font-bold shadow-lg transform-gpu hover:scale-110 transition-all duration-300`}
-                    >
-                      {getInitial()}
-                    </div>
+                    <img
+                      src={getAvatar()}
+                      alt={getUserDisplayName()}
+                      className="w-8 h-8 rounded-full object-cover border-2 border-yellow-400 shadow-lg transform-gpu hover:scale-110 transition-all duration-300"
+                      onError={(e) => {
+                        e.currentTarget.src =
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                            getUserDisplayName()
+                          )}&background=FBBF24&color=fff&size=128`;
+                      }}
+                    />
                   </Link>
                 </>
               ) : (
@@ -677,11 +700,17 @@ const Navbar = ({ children }) => {
                   onClick={() => setIsSidebarOpen(false)}
                   className="flex items-center gap-3 group"
                 >
-                  <div
-                    className={`w-12 h-12 rounded-full bg-gradient-to-r ${getAvatarGradient()} flex items-center justify-center text-white font-bold text-lg shadow-lg transform-gpu group-hover:scale-110 group-hover:rotate-y-6 transition-all duration-500 [transform-style:preserve-3d]`}
-                  >
-                    {getInitial()}
-                  </div>
+                  <img
+                    src={getAvatar()}
+                    alt={getUserDisplayName()}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-yellow-400 shadow-lg transform-gpu group-hover:scale-110 group-hover:rotate-y-6 transition-all duration-500 [transform-style:preserve-3d]"
+                    onError={(e) => {
+                      e.currentTarget.src =
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                          getUserDisplayName()
+                        )}&background=FBBF24&color=fff&size=128`;
+                    }}
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-gray-900 group-hover:text-yellow-600 transition-colors">
                       {getUserDisplayName()}

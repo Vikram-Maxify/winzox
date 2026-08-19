@@ -6,7 +6,6 @@ const powerballResultSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "PakistanGamePool",
       required: true,
-      unique: true,
     },
 
     drawNo: {
