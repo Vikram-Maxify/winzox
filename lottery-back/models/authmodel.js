@@ -25,12 +25,19 @@ const userschema = new mongoose.Schema(
       trim: true,
     },
 
+    // ================= PROFILE =================
+
+    profilePic: {
+      type: String,
+      default: null,
+    },
+
     balance: {
       type: Number,
       default: 0,
     },
 
-    country:{
+    country: {
       type: String,
       default: null,
     },
@@ -82,11 +89,8 @@ const userschema = new mongoose.Schema(
       default: null,
     },
 
-    // =========================
-    // Referral System
-    // =========================
+    // ================= REFERRAL =================
 
-    // User ka apna referral code
     referralCode: {
       type: String,
       unique: true,
@@ -95,7 +99,6 @@ const userschema = new mongoose.Schema(
       trim: true,
     },
 
-    // Registration ke time kis referral code se join kiya
     referredBy: {
       type: String,
       default: null,
@@ -103,26 +106,25 @@ const userschema = new mongoose.Schema(
       trim: true,
     },
 
-    // Referrer User ID
     referredByUser: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "users",
       default: null,
     },
 
-    // Total referrals
     totalReferrals: {
       type: Number,
       default: 0,
     },
 
-    // Referral earnings
     referralEarning: {
       type: Number,
       default: 0,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 const User = mongoose.model("users", userschema);

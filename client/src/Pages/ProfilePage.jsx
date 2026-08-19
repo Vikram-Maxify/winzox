@@ -75,14 +75,16 @@ export default function ProfilePage() {
 
   const getUserDisplayName = () => user?.name || user?.mobile || "User";
   const getUserId = () => (user?._id ? `@${user._id.slice(-8)}` : "@user");
-  const getAvatar = () => {
-    const name = user?.name || "User";
-    return (
-      user?.avatar ||
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=amber&color=fff&size=128`
-    );
-  };
+const getAvatar = () => {
+  const name = user?.name || "User";
 
+  return (
+    user?.profilePic ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      name
+    )}&background=amber&color=fff&size=128`
+  );
+};
   return (
     <div className="min-h-screen bg-slate-100 ">
       {/* Mobile Header */}

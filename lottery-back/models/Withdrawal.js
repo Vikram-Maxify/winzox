@@ -98,8 +98,6 @@ const withdrawalSchema = new mongoose.Schema({
   // Transaction Details
   transactionId: {
     type: String,
-    unique: true,
-    sparse: true,
   },
   referenceId: {
     type: String,

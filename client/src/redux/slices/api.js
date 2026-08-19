@@ -10,13 +10,13 @@ const api = axios.create({
   withCredentials: true,
 
   headers: {
-    "Content-Type": "application/json",
+    // ❌ Content-Type yahan mat lagao
+    // Axios FormData ke liye automatically
+    // multipart/form-data + boundary set karega.
 
     // ✅ NO CACHE
     "Cache-Control": "no-cache, no-store, must-revalidate",
-
     Pragma: "no-cache",
-
     Expires: "0",
   },
 });
@@ -27,25 +27,51 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    // ✅ prevent browser cache
+    // =================================================
+    // FORM DATA REQUEST
+    // =================================================
 
-    config.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+    if (config.data instanceof FormData) {
+      // IMPORTANT:
+      // JSON Content-Type remove karo.
+      // Browser/Axios khud multipart boundary lagayega.
+
+      if (config.headers) {
+        delete config.headers["Content-Type"];
+        delete config.headers["content-type"];
+      }
+    } else {
+      // Normal JSON requests ke liye
+      // Content-Type set karo.
+      if (config.headers) {
+        config.headers["Content-Type"] = "application/json";
+      }
+    }
+
+    // =================================================
+    // NO CACHE
+    // =================================================
+
+    config.headers["Cache-Control"] =
+      "no-cache, no-store, must-revalidate";
 
     config.headers.Pragma = "no-cache";
 
     config.headers.Expires = "0";
 
-    // ✅ unique request
+    // =================================================
+    // UNIQUE REQUEST
+    // =================================================
+
     config.params = {
       ...(config.params || {}),
-
       _t: Date.now(),
     };
 
     return config;
   },
 
-  (error) => Promise.reject(error),
+  (error) => Promise.reject(error)
 );
 
 // =====================================================
@@ -59,7 +85,8 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // Ignore guest profile checks
 
-      const isProfileCheck = error.config?.url?.includes("/auth/profile");
+      const isProfileCheck =
+        error.config?.url?.includes("/auth/profile");
 
       if (
         !isProfileCheck &&
@@ -71,8 +98,12 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  },
+  }
 );
+
+// =====================================================
+// HOST
+// =====================================================
 
 const host = "https://demo22.etsblokchain.live/";
 
