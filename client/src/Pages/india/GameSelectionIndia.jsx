@@ -33,7 +33,7 @@ import {
   createGameEntry,
   resetGameEntryState,
 } from "../redux/slices/india/gameEntrySlice";
-import { getUserTicketTypes } from "../redux/slices/ticketTypeSlice";
+import { getUserTicketTypes } from "../../redux/slices/india/gameCountSlice";
 
 // Countries data
 const countries = [

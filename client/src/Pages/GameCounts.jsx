@@ -252,36 +252,43 @@ const GameSelection = () => {
       stateKey: "indiaGameCount",
       getGameCounts: getIndiaGameCounts,
       countryCode: "IN",
+      displayName: "India",
     },
     australia: {
       stateKey: "australiaGameCount",
       getGameCounts: getAustraliaGameCounts,
       countryCode: "AU",
+      displayName: "Australia",
     },
     pakistan: {
       stateKey: "pakistanGameCount",
       getGameCounts: getPakistanGameCounts,
       countryCode: "PK",
+      displayName: "Pakistan",
     },
     canada: {
       stateKey: "canadaGameCount",
       getGameCounts: getCanadaGameCounts,
       countryCode: "CA",
+      displayName: "Canada",
     },
     nepal: {
       stateKey: "nepalGameCount",
       getGameCounts: getNepalGameCounts,
       countryCode: "NP",
+      displayName: "Nepal",
     },
     dubai: {
       stateKey: "uaeGameCount",
       getGameCounts: getUaeGameCounts,
       countryCode: "UAE",
+      displayName: "Dubai",
     },
     uae: {
       stateKey: "uaeGameCount",
       getGameCounts: getUaeGameCounts,
       countryCode: "UAE",
+      displayName: "UAE",
     },
   };
 
@@ -296,27 +303,47 @@ const GameSelection = () => {
     (state) => state.ticketType || {},
   );
 
-  console.log(ticketTypes, "ticket type h ye");
+  // Get all game counts from all country slices
+  const indiaGameCounts = useSelector((state) => state.indiaGameCount?.gameCounts || []);
+  const australiaGameCounts = useSelector((state) => state.australiaGameCount?.gameCounts || []);
+  const pakistanGameCounts = useSelector((state) => state.pakistanGameCount?.gameCounts || []);
+  const canadaGameCounts = useSelector((state) => state.canadaGameCount?.gameCounts || []);
+  const nepalGameCounts = useSelector((state) => state.nepalGameCount?.gameCounts || []);
+  const uaeGameCounts = useSelector((state) => state.uaeGameCount?.gameCounts || []);
 
-  // Get country-specific game counts from Redux
-  const countryGameCountState = useSelector((state) => {
-    if (!activeCountryConfig) {
-      return { gameCounts: [], loading: false, error: null };
+  // Get the correct game counts based on active country
+  const getGameCountsByCountry = () => {
+    if (!activeCountryConfig) return [];
+    
+    switch(activeCountryConfig.stateKey) {
+      case 'indiaGameCount': return indiaGameCounts;
+      case 'australiaGameCount': return australiaGameCounts;
+      case 'pakistanGameCount': return pakistanGameCounts;
+      case 'canadaGameCount': return canadaGameCounts;
+      case 'nepalGameCount': return nepalGameCounts;
+      case 'uaeGameCount': return uaeGameCounts;
+      default: return [];
     }
-    return (
-      state[activeCountryConfig.stateKey] || {
-        gameCounts: [],
-        loading: false,
-        error: null,
-      }
-    );
-  });
+  };
 
-  const {
-    gameCounts = [],
-    loading: gameCountLoading = false,
-    error: gameCountError = null,
-  } = countryGameCountState;
+  const gameCounts = getGameCountsByCountry();
+
+  // Get loading states
+  const getLoadingState = () => {
+    if (!activeCountryConfig) return false;
+    
+    switch(activeCountryConfig.stateKey) {
+      case 'indiaGameCount': return useSelector((state) => state.indiaGameCount?.loading || false);
+      case 'australiaGameCount': return useSelector((state) => state.australiaGameCount?.loading || false);
+      case 'pakistanGameCount': return useSelector((state) => state.pakistanGameCount?.loading || false);
+      case 'canadaGameCount': return useSelector((state) => state.canadaGameCount?.loading || false);
+      case 'nepalGameCount': return useSelector((state) => state.nepalGameCount?.loading || false);
+      case 'uaeGameCount': return useSelector((state) => state.uaeGameCount?.loading || false);
+      default: return false;
+    }
+  };
+
+  const gameCountLoading = getLoadingState();
 
   const {
     loading: entryLoading,
@@ -407,6 +434,18 @@ const GameSelection = () => {
   }, [ticketTypes, activeTicket]);
 
   const filteredGameCounts = useMemo(() => {
+    console.log("🔄 Filtering game counts:", {
+      gameCountsLength: gameCounts?.length || 0,
+      activeTicket,
+      selectedGameType,
+      gameCounts: gameCounts
+    });
+
+    if (!gameCounts || gameCounts.length === 0) {
+      console.warn("⚠️ No game counts available");
+      return [];
+    }
+
     const result = gameCounts.filter((item) => {
       const ticketId = item.ticketType?._id || item.ticketType;
       if (ticketId !== activeTicket) return false;
@@ -415,11 +454,14 @@ const GameSelection = () => {
       return gameTypeId === selectedGameType;
     });
 
+    console.log("📊 Filtered game counts:", result);
+
     if (result.length === 0 && gameCounts.length > 0) {
       const anyForTicket = gameCounts.filter(
         (item) => (item.ticketType?._id || item.ticketType) === activeTicket,
       );
       if (anyForTicket.length > 0) {
+        console.log("🔄 Using fallback: any for ticket", anyForTicket);
         return anyForTicket;
       }
     }
@@ -497,44 +539,19 @@ const GameSelection = () => {
   // EFFECTS
   // ==========================================
 
-  // Debug: Log full ticket data
-  useEffect(() => {
-    if (ticketTypes.length > 0) {
-      console.log("📦 Full Ticket Types:", JSON.stringify(ticketTypes, null, 2));
-      ticketTypes.forEach((ticket) => {
-        console.log(`🎫 Ticket: ${ticket.title}`, {
-          id: ticket._id,
-          order: ticket.order,
-          isActive: ticket.isActive,
-          gameTypes: ticket.gameTypes?.map((gt) => ({
-            id: gt._id,
-            title: gt.title,
-            order: gt.order,
-            isActive: gt.isActive,
-            description: gt.description,
-          })),
-        });
-      });
-    }
-  }, [ticketTypes]);
-
-  // Debug: Log game counts
-  useEffect(() => {
-    if (gameCounts.length > 0) {
-      console.log("📊 Full Game Counts:", JSON.stringify(gameCounts, null, 2));
-    }
-  }, [gameCounts]);
-
   useEffect(() => {
     dispatch(getUserTicketTypes());
   }, [dispatch]);
 
+  // Fetch game counts when country changes
   useEffect(() => {
     if (activeCountryConfig && activeTicket) {
+      console.log(`🔄 Fetching game counts for: ${activeCountryConfig.stateKey}`);
       dispatch(activeCountryConfig.getGameCounts());
     }
   }, [dispatch, activeCountryConfig, activeTicket]);
 
+  // Set initial ticket
   useEffect(() => {
     if (ticketTypes.length > 0 && !activeTicket) {
       if (urlCountry) {
@@ -1349,8 +1366,6 @@ const GameSelection = () => {
                   {item.label && ` (${item.label})`}
                   {item.discount && ` - ${item.discount}% off`}
                   {item.isActive !== undefined && !item.isActive && " (Inactive)"}
-                  {/* Show additional info */}
-                  {item.ticketType?._id && ` | Ticket: ${item.ticketType.title || item.ticketType}`}
                 </option>
               ))}
             </select>
@@ -1937,79 +1952,30 @@ const GameSelection = () => {
 
                   {/* Full Details Grid */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
-                    {/* Ticket Details */}
                     <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3">
                       <p className="text-[10px] text-white/70">Ticket</p>
                       <p className="font-bold text-sm truncate">
                         {activeTicketTitle}
                       </p>
-                      {ticketTypes.find((t) => t._id === activeTicket) && (
-                        <>
-                          <p className="text-[8px] font-mono text-white/50 truncate">
-                            ID: {ticketTypes.find((t) => t._id === activeTicket)?._id?.slice(-6) || 'N/A'}
-                          </p>
-                          <p className="text-[8px] text-white/50">
-                            Order: {ticketTypes.find((t) => t._id === activeTicket)?.order || 0}
-                            {" "}
-                            {ticketTypes.find((t) => t._id === activeTicket)?.isActive ? "🟢" : "🔴"}
-                          </p>
-                          <p className="text-[8px] text-white/50">
-                            Game Types: {ticketTypes.find((t) => t._id === activeTicket)?.gameTypes?.length || 0}
-                          </p>
-                        </>
-                      )}
                     </div>
-
-                    {/* Game Type Details */}
                     <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3">
                       <p className="text-[10px] text-white/70">Game Type</p>
                       <p className="font-bold text-sm truncate">
                         {selectedGameTypeTitle || 'Standard'}
                       </p>
-                      {selectedGameTypeOrder !== undefined && (
-                        <p className="text-[8px] text-white/50">
-                          Order: {selectedGameTypeOrder}
-                        </p>
-                      )}
-                      {availableGameTypes.find((g) => g.id === selectedGameType)?.isActive !== undefined && (
-                        <p className="text-[8px] text-white/50">
-                          {availableGameTypes.find((g) => g.id === selectedGameType)?.isActive ? "✅ Active" : "❌ Inactive"}
-                        </p>
-                      )}
                     </div>
-
-                    {/* Game Count Details */}
                     <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3">
                       <p className="text-[10px] text-white/70">Package</p>
                       <p className="font-bold text-sm">{selectedCount.totalGames} Games</p>
                       <p className="text-[8px] text-white/50">
-                        ₹{selectedCount.price} 
-                        {selectedCount.discount && ` (${selectedCount.discount}% off)`}
+                        ₹{selectedCount.price}
                       </p>
-                      {selectedCount.label && (
-                        <p className="text-[8px] text-white/50">{selectedCount.label}</p>
-                      )}
                     </div>
-
-                    {/* Mode Details */}
                     <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3">
                       <p className="text-[10px] text-white/70">Mode</p>
                       <p className="font-bold text-sm capitalize">
                         {selectionMode === 'quickpick' ? 'QuickPick' : 'Manual'}
                       </p>
-                      <p className="text-[8px] text-white/50">
-                        {games.filter((g) => {
-                          if (selectionMode === 'quickpick') {
-                            return g.numbers?.length === 7 && g.powerball;
-                          }
-                          return g.selectedNumbers?.length === 7 && g.selectedPowerball;
-                        }).length}/{games.length} Complete
-                      </p>
-                      {autoPlay && (
-                        <p className="text-[8px] text-white/50">
-                          {drawCount} draws
-                        </p>
-                      )}
                     </div>
                   </div>
 
@@ -2017,19 +1983,9 @@ const GameSelection = () => {
                     <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
                       {selectedCount.totalGames} Games
                     </span>
-                    {selectedCount.label && (
-                      <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
-                        {selectedCount.label}
-                      </span>
-                    )}
                     <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
                       {activeTicketTitle}
                     </span>
-                    {selectedGameTypeTitle && (
-                      <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10">
-                        {selectedGameTypeTitle}
-                      </span>
-                    )}
                     <span className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg shadow-black/10 capitalize">
                       {selectionMode === "quickpick"
                         ? "QuickPick"
@@ -2051,11 +2007,6 @@ const GameSelection = () => {
                       <span className="text-yellow-300 text-[10px] font-mono font-bold">
                         {activeCountryCode}
                       </span>
-                      {urlCountry && (
-                        <span className="text-yellow-300 text-[8px]">
-                          (URL)
-                        </span>
-                      )}
                     </span>
                   </div>
                 </div>
