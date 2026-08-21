@@ -1,7 +1,6 @@
 const Bid = require("../models/Bid");
 const Market = require("../models/Market");
 const User = require("../models/authmodel");
-const BettingBonus = require("../models/BettingBonus");
 const mongoose = require("mongoose");
 
 // ================= HELPER FUNCTIONS =================
@@ -1992,19 +1991,7 @@ exports.declareResult = async (req, res) => {
     let totalWon = 0;
     let totalLost = 0;
     let totalPayout = 0;
-    let totalBettingBonus = 0;
-    let totalBonusRecipients = 0;
     const winningBidsList = [];
-
-    // Load admin-configured betting bonus once for this result declaration.
-    const bonusConfig = await BettingBonus.findOne().session(session);
-    const bonusIsActive =
-      bonusConfig &&
-      bonusConfig.isActive === true &&
-      Number(bonusConfig.percentage) > 0;
-    const bonusPercentage = bonusIsActive
-      ? Number(bonusConfig.percentage)
-      : 0;
 
     for (const bid of pendingBids) {
       const isWin = checkBidWin(bid, formattedWinningNumber);
@@ -2016,50 +2003,13 @@ exports.declareResult = async (req, res) => {
         bid.wonAt = new Date();
         bid.resultNumber = formattedWinningNumber;
 
-        // Add winnings to winner's balance
+        // Add winnings to user balance
         const user = await User.findById(bid.userId).session(session);
-
         if (user) {
-          const winAmount = Number(bid.possibleWinAmount || 0);
-
-          user.balance += winAmount;
+          user.balance += bid.possibleWinAmount;
           await user.save({ session });
-
-          totalPayout += winAmount;
-
-          // ======================================================
-          // ADMIN CONFIGURABLE BETTING / REFERRAL BONUS
-          // ======================================================
-          // Bonus = winning amount × admin-configured percentage.
-          // It is credited to the winner's referrer (referredBy).
-          if (user.referredBy && bonusIsActive && winAmount > 0) {
-            const bonusAmount = Number(
-              ((winAmount * bonusPercentage) / 100).toFixed(2)
-            );
-
-            if (bonusAmount > 0) {
-              const referrer = await User.findById(user.referredBy).session(
-                session
-              );
-
-              if (referrer) {
-                referrer.balance += bonusAmount;
-                await referrer.save({ session });
-
-                totalBettingBonus += bonusAmount;
-                totalBonusRecipients++;
-
-                // These values are available in the response.
-                // If not defined in Bid schema, Mongoose strict mode
-                // will simply not persist them.
-                bid.bettingBonusPercentage = bonusPercentage;
-                bid.bettingBonusAmount = bonusAmount;
-                bid.bettingBonusUserId = referrer._id;
-              }
-            }
-          }
+          totalPayout += bid.possibleWinAmount;
         }
-
         totalWon++;
         winningBidsList.push(bid);
       } else {
@@ -2087,9 +2037,6 @@ exports.declareResult = async (req, res) => {
       totalBids: pendingBids.length,
       totalWinningBids: totalWon,
       totalPayout: totalPayout,
-      bettingBonusPercentage: bonusPercentage,
-      totalBettingBonus,
-      totalBonusRecipients,
       status: "declared",
     };
 
@@ -2122,24 +2069,19 @@ exports.declareResult = async (req, res) => {
           winningNumber: formattedWinningNumber,
           gameType,
         },
-        result: result[0],          summary: {
-            totalBidsProcessed: pendingBids.length,
-            totalWon,
-            totalLost,
-            totalPayout,
-            bettingBonusPercentage: bonusPercentage,
-            totalBettingBonus,
-            totalBonusRecipients,
-          },
+        result: result[0],
+        summary: {
+          totalBidsProcessed: pendingBids.length,
+          totalWon,
+          totalLost,
+          totalPayout,
+        },
         winningBids: winningBidsList.map((b) => ({
           id: b._id,
           userId: b.userId,
           number: b.number,
           bidAmount: b.bidAmount,
           winAmount: b.winAmount,
-          bettingBonusPercentage: b.bettingBonusPercentage || 0,
-          bettingBonusAmount: b.bettingBonusAmount || 0,
-          bettingBonusUserId: b.bettingBonusUserId || null,
         })),
       },
     });

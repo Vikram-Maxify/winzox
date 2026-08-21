@@ -49,11 +49,9 @@ const AdminMarkets = () => {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
-  // ✅ FIX: gameTypes as array
   const [formData, setFormData] = useState({
     name: "",
     marketId: "",
-    gameTypes: [], // Changed from gameType to gameTypes (array)
     openTime: "",
     closeTime: "",
     resultTime: "",
@@ -103,7 +101,6 @@ const AdminMarkets = () => {
       setFormData((prev) => ({
         ...prev,
         marketId: generateMarketId(),
-        gameTypes: [], // Reset gameTypes
       }));
     }
   }, [showModal, editingMarket, markets]);
@@ -116,38 +113,8 @@ const AdminMarkets = () => {
     });
   };
 
-  // ✅ FIX: Handle gameTypes multi-select
-  const handleGameTypeChange = (e) => {
-    const selectedOptions = Array.from(
-      e.target.selectedOptions,
-      (option) => option.value,
-    );
-    setFormData({
-      ...formData,
-      gameTypes: selectedOptions,
-    });
-  };
-
-  // ✅ FIX: Toggle individual game type
-  const toggleGameType = (type) => {
-    setFormData((prev) => {
-      const current = prev.gameTypes || [];
-      if (current.includes(type)) {
-        return { ...prev, gameTypes: current.filter((t) => t !== type) };
-      } else {
-        return { ...prev, gameTypes: [...current, type] };
-      }
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // ✅ FIX: Validate gameTypes
-    if (!formData.gameTypes || formData.gameTypes.length === 0) {
-      alert("Please select at least one game type");
-      return;
-    }
 
     const submitData = {
       ...formData,
@@ -181,7 +148,6 @@ const AdminMarkets = () => {
     setFormData({
       name: market.name || "",
       marketId: market.marketId || "",
-      gameTypes: market.gameTypes || [], // ✅ FIX: array
       openTime: market.openTime || "",
       closeTime: market.closeTime || "",
       resultTime: market.resultTime || "",
@@ -219,7 +185,6 @@ const AdminMarkets = () => {
     setFormData({
       name: "",
       marketId: generateMarketId(),
-      gameTypes: [],
       openTime: "",
       closeTime: "",
       resultTime: "",
@@ -390,7 +355,7 @@ const AdminMarkets = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {(market.gameTypes || []).map((type) => (
+                        {ALL_GAME_TYPES.map((type) => (
                           <span
                             key={type}
                             className={`px-2 py-0.5 text-xs font-medium rounded-full ${getGameTypeColor(type)}`}
@@ -398,12 +363,6 @@ const AdminMarkets = () => {
                             {getGameTypeLabel(type)}
                           </span>
                         ))}
-                        {(!market.gameTypes ||
-                          market.gameTypes.length === 0) && (
-                          <span className="text-xs text-gray-400">
-                            No types
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
@@ -540,47 +499,6 @@ const AdminMarkets = () => {
                   {!editingMarket && (
                     <p className="text-xs text-gray-400 mt-1">
                       Auto-generated: {formData.marketId || "MKT001"}
-                    </p>
-                  )}
-                </div>
-
-                {/* ✅ FIX: Game Types - Multi Select with Toggle Buttons */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Game Types * (Select at least one)
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {ALL_GAME_TYPES.map((type) => {
-                      const isSelected = (formData.gameTypes || []).includes(
-                        type,
-                      );
-                      return (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => toggleGameType(type)}
-                          className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                            isSelected
-                              ? "bg-amber-500 text-white shadow-md"
-                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                          }`}
-                        >
-                          {isSelected && (
-                            <Check size={14} className="inline mr-1" />
-                          )}
-                          {getGameTypeLabel(type)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {(!formData.gameTypes || formData.gameTypes.length === 0) && (
-                    <p className="text-xs text-red-500 mt-1">
-                      Please select at least one game type
-                    </p>
-                  )}
-                  {formData.gameTypes && formData.gameTypes.length > 0 && (
-                    <p className="text-xs text-green-600 mt-1">
-                      Selected: {formData.gameTypes.length} type(s)
                     </p>
                   )}
                 </div>
