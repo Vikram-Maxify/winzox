@@ -12,24 +12,24 @@ router.delete("/:bidId/cancel", protect, bidController.cancelBid);
 
 // ==================== Admin Routes ====================
 // Get all bids with filters
-router.get("/admin/all", protect, adminProtect, bidController.adminGetAllBids);
+router.get("/admin/all", protect,  bidController.adminGetAllBids);
 
 // Get bid stats
-router.get("/admin/stats", protect, adminProtect, bidController.adminGetBidStats);
+router.get("/admin/stats", protect,  bidController.adminGetBidStats);
 
 // Get today's bids
-router.get("/admin/today", protect, adminProtect, bidController.adminGetTodayBids);
+router.get("/admin/today", protect,  bidController.adminGetTodayBids);
 
 // Get bid by ID (Admin)
-router.get("/admin/:bidId", protect, adminProtect, bidController.adminGetBidById);
+router.get("/admin/:bidId", protect,  bidController.adminGetBidById);
 
 router.get("/admin/lowest/:marketId", bidController.getLowestBidNumber);
 
 
 // Update bid status
-router.put("/admin/:bidId/status", protect, adminProtect, bidController.adminUpdateBidStatus);
+router.put("/admin/:bidId/status", protect,  bidController.adminUpdateBidStatus);
 
 // Delete bid
-router.delete("/admin/:bidId", protect, adminProtect, bidController.adminDeleteBid);
+router.delete("/admin/:bidId", protect,  bidController.adminDeleteBid);
 
 module.exports = router;

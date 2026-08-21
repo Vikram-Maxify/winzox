@@ -11,7 +11,7 @@ const bidSchema = new mongoose.Schema(
 
     marketId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "markets",
+      ref: "Market",
       required: true,
       index: true,
     },
@@ -121,6 +121,7 @@ const bidSchema = new mongoose.Schema(
     transactionId: {
       type: String,
       required: true,
+      unique: true,
       trim: true,
     },
 

@@ -6,7 +6,7 @@ export const getGameCounts = createAsyncThunk(
   async (_, thunkAPI) => {
     try {
       const { data } = await api.get("/canada/game-counts");
-      return data.data;
+      return data.data || [];
     } catch (error) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || "Something went wrong");
     }
@@ -19,12 +19,17 @@ const canadaGameCountSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(getGameCounts.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(getGameCounts.pending, (state) => { 
+        state.loading = true; 
+        state.error = null; 
+      })
       .addCase(getGameCounts.fulfilled, (state, action) => {
-        state.loading = false; state.gameCounts = action.payload || [];
+        state.loading = false; 
+        state.gameCounts = action.payload || [];
       })
       .addCase(getGameCounts.rejected, (state, action) => {
-        state.loading = false; state.error = action.payload;
+        state.loading = false; 
+        state.error = action.payload;
       });
   },
 });

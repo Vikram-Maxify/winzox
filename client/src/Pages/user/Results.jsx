@@ -59,52 +59,24 @@ const MatkaResults = () => {
     });
   };
 
-  const getGameTypeDisplay = (type) => {
-    const display = {
-      single: "Single",
-      jodi: "Jodi",
-      panna: "Panna",
-      "half-sangam": "Half-Sangam",
-      "full-sangam": "Full-Sangam",
-      "last-digit": "Last Digit",
-      "first-digit": "First Digit",
-    };
-    return display[type] || type;
-  };
-
-  const getGameTypeColor = (type) => {
-    const colors = {
-      single:
-        "bg-gradient-to-r from-blue-400 to-blue-600 text-white shadow-blue-500/30",
-      jodi: "bg-gradient-to-r from-green-400 to-green-600 text-white shadow-green-500/30",
-      panna:
-        "bg-gradient-to-r from-purple-400 to-purple-600 text-white shadow-purple-500/30",
-      "half-sangam":
-        "bg-gradient-to-r from-orange-400 to-orange-600 text-white shadow-orange-500/30",
-      "full-sangam":
-        "bg-gradient-to-r from-red-400 to-red-600 text-white shadow-red-500/30",
-      "last-digit":
-        "bg-gradient-to-r from-indigo-400 to-indigo-600 text-white shadow-indigo-500/30",
-      "first-digit":
-        "bg-gradient-to-r from-pink-400 to-pink-600 text-white shadow-pink-500/30",
-    };
-    return (
-      colors[type] ||
-      "bg-gradient-to-r from-gray-400 to-gray-600 text-white shadow-gray-500/30"
-    );
-  };
-
-  const getGameTypeIcon = (type) => {
-    const icons = {
-      single: Target,
-      jodi: Hash,
-      panna: Dice5,
-      "half-sangam": Moon,
-      "full-sangam": Sun,
-      "last-digit": ArrowRightFromLine,
-      "first-digit": ArrowLeftFromLine,
-    };
-    return icons[type] || Gamepad2;
+  // ✅ Helper to get winning number display
+  const getWinningNumberDisplay = (result) => {
+    if (!result?.winningNumber) return "-";
+    
+    if (typeof result.winningNumber === 'object') {
+      const entries = Object.entries(result.winningNumber).filter(
+        ([_, value]) => value !== null && value !== ""
+      );
+      if (entries.length === 0) return "-";
+      // Show all winning numbers
+      return entries.map(([gameType, number]) => (
+        <span key={gameType} className="inline-flex items-center gap-1 mr-2">
+          <span className="text-[10px] text-gray-400">{gameType}:</span>
+          <span className="font-bold">{number}</span>
+        </span>
+      ));
+    }
+    return result.winningNumber;
   };
 
   const formatCurrency = (amount) => {
@@ -145,7 +117,7 @@ const MatkaResults = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-amber-50/30 px-4 sm:px-6 py-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header with 3D effect */}
+        {/* Header */}
         <div className="relative group">
           <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-400 rounded-2xl blur-xl opacity-30 group-hover:opacity-50 transition duration-500"></div>
           <div className="relative bg-white rounded-2xl shadow-xl p-6 border border-amber-100/50 transform group-hover:scale-[1.01] transition duration-300">
@@ -182,7 +154,7 @@ const MatkaResults = () => {
           </div>
         </div>
 
-        {/* Stats Cards with 3D effect */}
+        {/* Stats Cards */}
         {stats && stats.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
@@ -249,7 +221,7 @@ const MatkaResults = () => {
           </div>
         )}
 
-        {/* Filters with 3D effect */}
+        {/* Filters */}
         <div className="group relative">
           <div className="absolute -inset-1 bg-gradient-to-r from-amber-400/20 to-orange-400/20 rounded-2xl blur-xl"></div>
           <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/50 p-5">
@@ -314,7 +286,7 @@ const MatkaResults = () => {
           </div>
         </div>
 
-        {/* Results Table with 3D effect */}
+        {/* Results Table */}
         {results?.length > 0 ? (
           <div className="group relative">
             <div className="absolute -inset-1 bg-gradient-to-r from-amber-400/20 via-orange-400/20 to-yellow-400/20 rounded-2xl blur-xl"></div>
@@ -327,10 +299,7 @@ const MatkaResults = () => {
                         Market
                       </th>
                       <th className="px-4 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                        Game Type
-                      </th>
-                      <th className="px-4 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                        Winning Number
+                        Winning Numbers
                       </th>
                       <th className="px-4 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                         Total Bids
@@ -348,14 +317,10 @@ const MatkaResults = () => {
                   </thead>
                   <tbody className="divide-y divide-gray-100/50">
                     {results.map((result, index) => {
-                      const gameTypeDisplay = getGameTypeDisplay(
-                        result.gameType,
-                      );
-                      const gameTypeColor = getGameTypeColor(result.gameType);
-                      const GameTypeIcon = getGameTypeIcon(result.gameType);
                       const marketGradient = getMarketGradient(
                         result.marketName,
                       );
+                      const winningDisplay = getWinningNumberDisplay(result);
 
                       return (
                         <tr
@@ -370,30 +335,28 @@ const MatkaResults = () => {
                             </span>
                           </td>
                           <td className="px-4 py-3.5">
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full shadow-lg transform group-hover/row:scale-105 transition duration-300 ${gameTypeColor}`}
-                            >
-                              <GameTypeIcon size={14} />
-                              {gameTypeDisplay}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 font-black rounded-xl text-lg border border-green-200 shadow-lg shadow-green-500/10 transform group-hover/row:scale-105 transition duration-300">
-                              <Award size={16} className="text-green-500" />
-                              {result.winningNumber}
-                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {typeof winningDisplay === 'string' ? (
+                                <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 font-black rounded-xl text-lg border border-green-200 shadow-lg shadow-green-500/10">
+                                  <Award size={16} className="text-green-500" />
+                                  {winningDisplay}
+                                </span>
+                              ) : (
+                                winningDisplay
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3.5 text-sm font-semibold text-gray-700">
-                            {result.totalBids}
+                            {result.totalBids || 0}
                           </td>
                           <td className="px-4 py-3.5 text-sm font-semibold text-gray-700">
                             <span className="inline-flex items-center gap-1">
                               <Crown size={14} className="text-amber-400" />
-                              {result.totalWinningBids}
+                              {result.totalWinningBids || 0}
                             </span>
                           </td>
                           <td className="px-4 py-3.5 text-sm font-extrabold text-transparent bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text">
-                            {formatCurrency(result.totalPayout)}
+                            {formatCurrency(result.totalPayout || 0)}
                           </td>
                           <td className="px-4 py-3.5 text-sm text-gray-500 font-medium">
                             {new Date(result.resultDate).toLocaleDateString(
@@ -419,11 +382,7 @@ const MatkaResults = () => {
             <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/50 p-16 text-center">
               <div className="flex justify-center mb-4">
                 <div className="w-28 h-28 rounded-full bg-gradient-to-r from-amber-100 to-orange-100 flex items-center justify-center animate-float">
-                  <Inbox
-                    size={56}
-                    className="text-amber-500"
-                    strokeWidth={1.5}
-                  />
+                  <Inbox size={56} className="text-amber-500" strokeWidth={1.5} />
                 </div>
               </div>
               <p className="text-gray-600 text-xl font-semibold">
@@ -439,13 +398,8 @@ const MatkaResults = () => {
 
       <style jsx>{`
         @keyframes float {
-          0%,
-          100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-10px);
-          }
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
         }
         .animate-float {
           animation: float 3s ease-in-out infinite;

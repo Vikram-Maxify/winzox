@@ -68,7 +68,7 @@ const resultSchema = new mongoose.Schema(
   {
     marketId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "markets",
+      ref: "Market",
       required: true,
       index: true,
     },
