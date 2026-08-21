@@ -63,6 +63,8 @@ import uaePowerballDivisionReducer from "../admin/redux/uae/UaePowerballDivision
 
 import referralLevelReducer from "../admin/redux/referralLevelSlice";
 import bettingBonusReducer from "../admin/redux/bettingBonusSlice";
+import winMultiplierReducer from "../admin/redux/winMultiplierSlice";
+
 
 export const store = configureStore({
   reducer: {
@@ -134,5 +136,7 @@ export const store = configureStore({
     adminResult: adminResultReducer,
     currencyRate: currencyRateReducer,
     referralLevel: referralLevelReducer,
+    winMultiplier: winMultiplierReducer,
+
   },
 });
