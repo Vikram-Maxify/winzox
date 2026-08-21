@@ -33,6 +33,8 @@ const adminWithdrawalRoutes = require("./routes/admin/withdrawalRoutes");
 const depositSettingsRoutes = require("./routes/depositSettingsRoutes");
 const withdrawalSettingsRoutes = require("./routes/withdrawalSettingsRoutes");
 const adminTicketTypeRoutes = require("./routes/admin/ticketTypeRoutes");
+const winMultiplierRoutes = require("./routes/winMultiplierRoutes");
+
 
 // ============================================
 // COUNTRY-SPECIFIC ADMIN ROUTES
@@ -268,6 +270,8 @@ app.use("/api/currency", currencyRateRoutes);
 
 // User Ticket Types
 app.use("/api/user/ticket-types", userTicketTypeRoutes);
+
+app.use("/api/win-multipliers", winMultiplierRoutes);
 
 // ============================================
 // COUNTRY-SPECIFIC USER ROUTES

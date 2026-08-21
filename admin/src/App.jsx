@@ -62,6 +62,7 @@ import AdminUAEPowerballDivision from "./admin/pages/uae/UaePowerballDivisions";
 
 import ReferralLevels from "./admin/pages/ReferralLevels";
 import AdminBettingBonus from "./admin/pages/AdminBettingBonus";
+import AdminWinMultipliers from "./admin/pages/AdminWinMultipliers";
 
 function App() {
   return (
@@ -236,6 +237,11 @@ function App() {
           <Route
             path="/admin/betting-bonus"
             element={<AdminBettingBonus />}
+          />
+
+          <Route
+            path="/admin/win-multipliers"
+            element={<AdminWinMultipliers />}
           />
         </Route>
       </Route>
