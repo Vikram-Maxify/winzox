@@ -74,43 +74,22 @@ const MatkaDashboard = () => {
     dispatch(getActiveMarkets());
   }, [dispatch]);
 
-  const getGameTypeDisplay = (type) => {
-    const display = {
-      single: "Single",
-      jodi: "Jodi",
-      panna: "Panna",
-      "half-sangam": "Half-Sangam",
-      "full-sangam": "Full-Sangam",
-      "last-digit": "Last Digit",
-      "first-digit": "First Digit",
-    };
-    return display[type] || type;
-  };
-
-  const getGameTypeGradient = (type) => {
-    const gradients = {
-      single: "from-blue-400 to-indigo-500",
-      jodi: "from-green-400 to-emerald-500",
-      panna: "from-purple-400 to-violet-500",
-      "half-sangam": "from-orange-400 to-amber-500",
-      "full-sangam": "from-red-400 to-rose-500",
-      "last-digit": "from-cyan-400 to-blue-500",
-      "first-digit": "from-pink-400 to-rose-500",
-    };
-    return gradients[type] || "from-gray-400 to-gray-500";
-  };
-
-  const getGameTypeIcon = (type) => {
-    const icons = {
-      single: Target,
-      jodi: Hash,
-      panna: Dice5,
-      "half-sangam": Moon,
-      "full-sangam": Sun,
-      "last-digit": ArrowRightFromLine,
-      "first-digit": ArrowLeftFromLine,
-    };
-    return icons[type] || Gamepad2;
+  // ✅ Helper to get winning number display from result
+  const getWinningNumberDisplay = (result) => {
+    if (!result?.winningNumber) return "-";
+    
+    // If winningNumber is an object (multiple game types)
+    if (typeof result.winningNumber === 'object') {
+      const entries = Object.entries(result.winningNumber).filter(
+        ([_, value]) => value !== null && value !== ""
+      );
+      if (entries.length === 0) return "-";
+      // Return first winning number
+      return entries[0][1];
+    }
+    
+    // If winningNumber is a string
+    return result.winningNumber;
   };
 
   if (loading) {
@@ -135,7 +114,7 @@ const MatkaDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-amber-50/30 px-3 sm:px-4 py-4 sm:py-6">
       <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
-        {/* Welcome Section - Mobile Optimized */}
+        {/* Welcome Section */}
         <div className="group relative">
           <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-400 rounded-2xl blur-xl opacity-40 group-hover:opacity-60 transition duration-500"></div>
           <div className="relative bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 rounded-2xl shadow-2xl p-5 sm:p-8 text-white overflow-hidden transform group-hover:scale-[1.01] transition duration-500">
@@ -181,7 +160,7 @@ const MatkaDashboard = () => {
           </div>
         </div>
 
-        {/* Balance Card - Mobile Optimized */}
+        {/* Balance Card */}
         <div className="group relative">
           <div className="absolute -inset-1 bg-gradient-to-r from-amber-400/20 via-orange-400/20 to-yellow-400/20 rounded-2xl blur-xl"></div>
           <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/50 p-4 sm:p-6 overflow-hidden">
@@ -220,7 +199,7 @@ const MatkaDashboard = () => {
           </div>
         </div>
 
-        {/* Quick Stats - Mobile Grid 2x2 */}
+        {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-3">
           {[
             {
@@ -271,7 +250,7 @@ const MatkaDashboard = () => {
           ))}
         </div>
 
-        {/* Today's Results - Mobile Card View */}
+        {/* Today's Results */}
         <div className="group relative">
           <div className="absolute -inset-1 bg-gradient-to-r from-amber-400/20 via-orange-400/20 to-yellow-400/20 rounded-2xl blur-xl"></div>
           <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/50 overflow-hidden">
@@ -281,10 +260,7 @@ const MatkaDashboard = () => {
                   <div className="relative flex-shrink-0">
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-400 to-orange-500 rounded-xl blur-sm"></div>
                     <div className="relative bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl p-1.5 sm:p-2.5 shadow-lg">
-                      <Calendar
-                        size={16}
-                        className="text-white sm:w-5 sm:h-5"
-                      />
+                      <Calendar size={16} className="text-white sm:w-5 sm:h-5" />
                     </div>
                   </div>
                   <div>
@@ -312,10 +288,9 @@ const MatkaDashboard = () => {
             {todayResults?.length > 0 ? (
               <div className="divide-y divide-gray-100/50">
                 {todayResults.slice(0, 5).map((result, index) => {
-                  const gameTypeDisplay = getGameTypeDisplay(result.gameType);
-                  const gameTypeGradient = getGameTypeGradient(result.gameType);
-                  const GameTypeIcon = getGameTypeIcon(result.gameType);
-
+                  // ✅ Get winning number display
+                  const winningNumber = getWinningNumberDisplay(result);
+                  
                   return (
                     <div
                       key={result._id}
@@ -328,28 +303,17 @@ const MatkaDashboard = () => {
                             {result.marketName}
                           </span>
                         </div>
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] sm:text-xs font-bold rounded-full bg-gradient-to-r ${gameTypeGradient} text-white shadow-lg flex-shrink-0`}
-                        >
-                          <GameTypeIcon
-                            size={12}
-                            className="sm:w-[14px] sm:h-[14px]"
-                          />
-                          <span className="hidden xs:inline">
-                            {gameTypeDisplay}
-                          </span>
-                        </span>
                       </div>
 
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 font-black rounded-xl text-base sm:text-xl border border-green-200 shadow-lg shadow-green-500/10">
                             <Award className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
-                            {result.winningNumber}
+                            {winningNumber}
                           </span>
                         </div>
                         <span className="font-extrabold text-transparent bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-sm sm:text-base">
-                          {formatCurrency(result.totalPayout)}
+                          {formatCurrency(result.totalPayout || 0)}
                         </span>
                       </div>
                     </div>
@@ -360,11 +324,7 @@ const MatkaDashboard = () => {
               <div className="text-center py-12 sm:py-16 px-4">
                 <div className="flex justify-center mb-4">
                   <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full bg-gradient-to-r from-amber-100 to-orange-100 flex items-center justify-center">
-                    <Inbox
-                      size={40}
-                      className="text-amber-500 sm:w-14 sm:h-14"
-                      strokeWidth={1.5}
-                    />
+                    <Inbox size={40} className="text-amber-500 sm:w-14 sm:h-14" strokeWidth={1.5} />
                   </div>
                 </div>
                 <p className="text-gray-700 font-bold text-base sm:text-xl">
@@ -378,7 +338,7 @@ const MatkaDashboard = () => {
           </div>
         </div>
 
-        {/* Quick Links - Mobile 3 Column */}
+        {/* Quick Links */}
         <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
           {[
             {
@@ -436,32 +396,6 @@ const MatkaDashboard = () => {
           </span>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
-        }
-        .animate-pulse {
-          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        .delay-1000 {
-          animation-delay: 1s;
-        }
-        @media (min-width: 480px) {
-          .xs\\:inline {
-            display: inline !important;
-          }
-          .xs\\:block {
-            display: block !important;
-          }
-        }
-      `}</style>
     </div>
   );
 };
