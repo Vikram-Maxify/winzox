@@ -10,6 +10,7 @@ import {
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { getAdminMarkets } from "../redux/adminMarketSlice";
+import { getLowestBidNumber, clearLowestBid } from "../redux/adminBidSlice";
 import {
   clearError,
   clearMessage,
@@ -35,6 +36,13 @@ const AdminResults = () => {
   const marketState = useSelector((state) => state.adminMarket) || {};
   const { markets = [] } = marketState;
 
+  const bidState = useSelector((state) => state.adminBid) || {};
+  const {
+    lowestBid = null,
+    lowestBidLoading = false,
+    lowestBidError = null,
+  } = bidState;
+
   const [showModal, setShowModal] = useState(false);
   const [filter, setFilter] = useState({
     marketId: "",
@@ -44,7 +52,6 @@ const AdminResults = () => {
     limit: 20,
   });
   
-  // ✅ Form data with all game types
   const [formData, setFormData] = useState({
     marketId: "",
     winningNumbers: {
@@ -99,6 +106,13 @@ const AdminResults = () => {
         ...formData,
         [name]: value,
       });
+
+      // Fetch the lowest bid number for the selected market.
+      if (name === "marketId") {
+        if (value) {
+          dispatch(getLowestBidNumber(value));
+        }
+      }
     }
   };
 
@@ -110,7 +124,6 @@ const AdminResults = () => {
       return;
     }
 
-    // ✅ Check if at least one winning number is provided
     const hasAnyNumber = Object.values(formData.winningNumbers).some(
       (num) => num && num.trim() !== ""
     );
@@ -130,6 +143,7 @@ const AdminResults = () => {
     dispatch(getAdminResults(filter));
     dispatch(getAdminResultStats());
     setShowModal(false);
+    dispatch(clearLowestBid());
     setFormData({
       marketId: "",
       winningNumbers: {
@@ -163,7 +177,6 @@ const AdminResults = () => {
     }).format(amount || 0);
   };
 
-  // ✅ Get game type display name
   const getGameTypeDisplay = (type) => {
     const display = {
       single: "Single",
@@ -177,27 +190,78 @@ const AdminResults = () => {
     return display[type] || type || "N/A";
   };
 
-  // ✅ Render winning numbers
+  // ✅ FINAL FIXED: Safely render winning numbers
   const renderWinningNumbers = (result) => {
-    if (!result.winningNumber || typeof result.winningNumber !== 'object') {
+    try {
+      // Agar result hi nahi hai
+      if (!result) {
+        return <span className="text-gray-400 text-xs">N/A</span>;
+      }
+
+      // Agar winningNumber exist nahi karta
+      if (!result.winningNumber) {
+        return <span className="text-gray-400 text-xs">N/A</span>;
+      }
+
+      const wn = result.winningNumber;
+
+      // Agar winningNumber string hai (backward compatibility)
+      if (typeof wn === 'string') {
+        return (
+          <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">
+            {wn}
+          </span>
+        );
+      }
+
+      // Agar winningNumber array hai
+      if (Array.isArray(wn)) {
+        return wn.map((num, index) => (
+          <span
+            key={index}
+            className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 mr-1 mb-1 inline-block"
+          >
+            {num}
+          </span>
+        ));
+      }
+
+      // Agar winningNumber object hai (tumhara case)
+      if (typeof wn === 'object') {
+        // Filter karo sirf non-null, non-empty values
+        const entries = Object.entries(wn).filter(([key, value]) => {
+          return value !== null && 
+                 value !== undefined && 
+                 value !== '' && 
+                 value !== 'null' &&
+                 value !== 'undefined';
+        });
+
+        // Agar koi entry nahi hai
+        if (entries.length === 0) {
+          return <span className="text-gray-400 text-xs">N/A</span>;
+        }
+
+        // Map karo entries ko React elements mein
+        return entries.map(([gameType, number]) => {
+          const displayName = getGameTypeDisplay(gameType);
+          return (
+            <span
+              key={gameType}
+              className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 mr-1 mb-1 inline-block"
+            >
+              {displayName}: {number}
+            </span>
+          );
+        });
+      }
+
+      // Fallback
       return <span className="text-gray-400 text-xs">N/A</span>;
+    } catch (error) {
+      console.error("Error rendering winning numbers:", error);
+      return <span className="text-gray-400 text-xs">Error</span>;
     }
-
-    const numbers = result.winningNumber;
-    const entries = Object.entries(numbers).filter(([_, value]) => value !== null && value !== "");
-
-    if (entries.length === 0) {
-      return <span className="text-gray-400 text-xs">N/A</span>;
-    }
-
-    return entries.map(([gameType, number]) => (
-      <span
-        key={gameType}
-        className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700"
-      >
-        {getGameTypeDisplay(gameType)}: {number}
-      </span>
-    ));
   };
 
   const calculateStats = () => {
@@ -224,15 +288,35 @@ const AdminResults = () => {
     return { totalResults, totalPayout, totalWinningBids, avgPayout };
   };
 
+  // Safely resolve market when API returns either:
+  // marketId: "ObjectId string"
+  // OR marketId: { _id, name, marketId }
   const getMarketName = (marketId) => {
     if (!marketId) return "N/A";
-    const market = markets.find((m) => m._id === marketId);
-    return market?.name || marketId || "N/A";
+
+    // Populated market object
+    if (typeof marketId === "object") {
+      return (
+        marketId.name ||
+        marketId.marketName ||
+        marketId.marketId ||
+        marketId._id?.toString?.() ||
+        "N/A"
+      );
+    }
+
+    // Plain ObjectId/string
+    const marketIdString = String(marketId);
+
+    const market = markets.find(
+      (m) => m && String(m._id) === marketIdString
+    );
+
+    return market?.name || market?.marketName || marketIdString || "N/A";
   };
 
   const statsData = calculateStats();
 
-  // ✅ Game types list for modal
   const gameTypes = [
     { key: "single", label: "Single", placeholder: "0-9" },
     { key: "jodi", label: "Jodi", placeholder: "00-99" },
@@ -357,7 +441,7 @@ const AdminResults = () => {
               <option value="">All Markets</option>
               {markets?.map((m) => (
                 <option key={m._id} value={m._id}>
-                  {m.name}
+                  {m?.name || m?.marketName || "Unnamed Market"}
                 </option>
               ))}
             </select>
@@ -537,7 +621,10 @@ const AdminResults = () => {
                 Declare Result
               </h2>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowModal(false);
+                  dispatch(clearLowestBid());
+                }}
                 className="p-2 hover:bg-gray-100 rounded-lg transition"
               >
                 <X size={20} />
@@ -560,16 +647,48 @@ const AdminResults = () => {
                   >
                     <option value="">Select Market</option>
                     {markets
-                      ?.filter((m) => m.isActive && !m.isResultDeclared)
+                      ?.filter((m) => m?.isActive && !m?.isResultDeclared)
                       .map((m) => (
                         <option key={m._id} value={m._id}>
-                          {m.name}
+                          {m?.name || m?.marketName || "Unnamed Market"}
                         </option>
                       ))}
                   </select>
                   <p className="text-xs text-gray-400 mt-1">
                     Showing only active markets with pending results
                   </p>
+
+                  {formData.marketId && (
+                    <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs font-medium text-gray-600">
+                          Lowest Bid Number
+                        </span>
+
+                        {lowestBidLoading ? (
+                          <span className="text-xs text-amber-600">
+                            Loading...
+                          </span>
+                        ) : lowestBidError ? (
+                          <span className="text-xs text-red-500">
+                            {String(lowestBidError)}
+                          </span>
+                        ) : (
+                          <span className="text-sm font-bold text-amber-700">
+                            {typeof lowestBid === "object" && lowestBid !== null
+                              ? (
+                                  lowestBid.number ??
+                                  lowestBid.lowestBidNumber ??
+                                  lowestBid.data?.number ??
+                                  lowestBid.data?.lowestBidNumber ??
+                                  "N/A"
+                                )
+                              : lowestBid ?? "N/A"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Winning Numbers for all game types */}
