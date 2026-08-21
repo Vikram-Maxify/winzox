@@ -113,23 +113,35 @@ const BidsHistory = () => {
     }).format(amount || 0);
   };
 
-  // ✅ Expected digit count per game type (jodi=2, single=1, rest=3)
-  const getDigitCount = (gameType) => {
-    const counts = {
-      single: 1,
-      jodi: 2,
-      panna: 3,
-      "half-sangam": 3,
-      "full-sangam": 3,
-      "last-digit": 1,
-      "first-digit": 1,
-    };
-    return counts[gameType] || 3;
+  // ✅ Expected digit count per game type — matches backend validator exactly
+  // single: 1 | jodi: 2 | panna: 3 | full-sangam: 2 | last-digit: 2 | first-digit: 2
+  // half-sangam: 1-digit OR 3-digit (variable) — inferred from the actual value's length
+  const getDigitCount = (gameType, value) => {
+    switch (gameType) {
+      case "single":
+        return 1;
+      case "jodi":
+        return 2;
+      case "panna":
+        return 3;
+      case "full-sangam":
+        return 2;
+      case "last-digit":
+        return 2;
+      case "first-digit":
+        return 2;
+      case "half-sangam": {
+        const len = String(value ?? "").trim().length;
+        return len === 3 ? 3 : 1;
+      }
+      default:
+        return 3;
+    }
   };
 
-  // ✅ Get result digits for balls — respects gameType's digit count now
+  // ✅ Get result digits for balls — respects gameType's actual digit count
   const getResultDigits = (number, gameType) => {
-    const digitCount = getDigitCount(gameType);
+    const digitCount = getDigitCount(gameType, number);
     if (!number) return Array(digitCount).fill("-");
     const str = String(number).trim();
     const digits = str.split("");
@@ -139,7 +151,7 @@ const BidsHistory = () => {
     return digits.slice(-digitCount);
   };
 
-  // ✅ Render number balls — now passes gameType through
+  // ✅ Render number balls — gameType passed through for correct digit count
   const renderNumberBalls = (number, status, gameType, size = "md") => {
     if (!number) return null;
     const digits = getResultDigits(number, gameType);

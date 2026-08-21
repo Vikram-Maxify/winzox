@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { getActiveMarkets } from "../../redux/slices/marketSlice";
 
 /* ============================================================
@@ -417,15 +417,12 @@ const MatkaMarkets = () => {
                     >
                       {market.status === "live" ? "PLAY NOW →" : "VIEW →"}
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openMarket(market._id);
-                      }}
-                      className="mt-1 w-full text-center text-[11px] font-semibold text-amber-700"
+                    <Link
+                      to={"/matka/bids-history"}
+                      className="mt-1 w-full inline-flex items-center justify-center text-[11px] font-bold text-amber-700"
                     >
                       RESULTS →
-                    </button>
+                    </Link>
                   </div>
                 );
               })}
