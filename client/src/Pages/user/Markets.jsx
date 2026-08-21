@@ -25,7 +25,7 @@ import {
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { getActiveMarkets } from "../../redux/slices/marketSlice";
 
 /* ============================================================

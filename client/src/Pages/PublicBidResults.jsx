@@ -122,12 +122,20 @@ const LiveResults = () => {
                   key={bid._id}
                   className="min-w-[100px] shrink-0 snap-start border border-gray-100 rounded-xl px-2.5 py-2.5 text-center"
                 >
+                  {/* Market name — highlighted at top */}
                   <p className="text-[11px] font-bold text-amber-600 uppercase truncate">
-                    {getGameTypeLabel(bid.gameType)}
+                    {bid.marketId?.name || "N/A"}
                   </p>
+
+                  {/* Game type — small badge below market name */}
+                  <span className="inline-block text-[9px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full mt-1 mb-1">
+                    {getGameTypeLabel(bid.gameType)}
+                  </span>
+
                   <p className="text-[10px] text-gray-400 mb-1.5">
                     {format(new Date(bid.createdAt), "hh:mm a")}
                   </p>
+
                   <div className="flex items-center justify-center gap-1 mb-1.5">
                     {String(bid.resultNumber || bid.number)
                       .split("")

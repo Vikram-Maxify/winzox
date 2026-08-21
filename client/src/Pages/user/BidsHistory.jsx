@@ -113,21 +113,48 @@ const BidsHistory = () => {
     }).format(amount || 0);
   };
 
-  // ✅ Get result digits for balls
-  const getResultDigits = (number) => {
-    if (!number) return ["-", "-", "-"];
-    const str = String(number).trim();
-    const digits = str.split("");
-    while (digits.length < 3) {
-      digits.unshift("0");
+  // ✅ Expected digit count per game type — matches backend validator exactly
+  // single: 1 | jodi: 2 | panna: 3 | full-sangam: 2 | last-digit: 2 | first-digit: 2
+  // half-sangam: 1-digit OR 3-digit (variable) — inferred from the actual value's length
+  const getDigitCount = (gameType, value) => {
+    switch (gameType) {
+      case "single":
+        return 1;
+      case "jodi":
+        return 2;
+      case "panna":
+        return 3;
+      case "full-sangam":
+        return 2;
+      case "last-digit":
+        return 2;
+      case "first-digit":
+        return 2;
+      case "half-sangam": {
+        const len = String(value ?? "").trim().length;
+        return len === 3 ? 3 : 1;
+      }
+      default:
+        return 3;
     }
-    return digits.slice(0, 3);
   };
 
-  // ✅ Render number balls
-  const renderNumberBalls = (number, status, size = "md") => {
+  // ✅ Get result digits for balls — respects gameType's actual digit count
+  const getResultDigits = (number, gameType) => {
+    const digitCount = getDigitCount(gameType, number);
+    if (!number) return Array(digitCount).fill("-");
+    const str = String(number).trim();
+    const digits = str.split("");
+    while (digits.length < digitCount) {
+      digits.unshift("0");
+    }
+    return digits.slice(-digitCount);
+  };
+
+  // ✅ Render number balls — gameType passed through for correct digit count
+  const renderNumberBalls = (number, status, gameType, size = "md") => {
     if (!number) return null;
-    const digits = getResultDigits(number);
+    const digits = getResultDigits(number, gameType);
     const isWin = status === "won";
     const isLost = status === "lost";
 
@@ -304,147 +331,124 @@ const BidsHistory = () => {
           </div>
         )}
 
-        {/* Table */}
+        {/* Bids list */}
         {bidsArray.length > 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                {/* Table Header */}
-                <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Market
-                    </th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Game
-                    </th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Number
-                    </th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Result
-                    </th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Date
-                    </th>
-                  </tr>
-                </thead>
+            {/* Cards list — no horizontal scroll on any screen size */}
+            <div className="divide-y divide-gray-100">
+              {bidsArray.map((bid) => {
+                const statusConfig = getStatusConfig(bid.status);
+                const StatusIcon = statusConfig.icon;
+                const gameTypeDisplay = getGameTypeDisplay(bid.gameType);
+                const isResultDeclared =
+                  bid.resultNumber !== null &&
+                  bid.resultNumber !== undefined &&
+                  bid.resultNumber !== "";
 
-                {/* Table Body */}
-                <tbody className="divide-y divide-gray-100">
-                  {bidsArray.map((bid) => {
-                    const statusConfig = getStatusConfig(bid.status);
-                    const StatusIcon = statusConfig.icon;
-                    const gameTypeDisplay = getGameTypeDisplay(bid.gameType);
-                    const isResultDeclared =
-                      bid.resultNumber !== null &&
-                      bid.resultNumber !== undefined &&
-                      bid.resultNumber !== "";
-
-                    return (
-                      <tr
-                        key={bid._id}
-                        className="hover:bg-amber-50/30 transition-colors"
+                return (
+                  <div
+                    key={bid._id}
+                    className="p-3.5 hover:bg-amber-50/30 transition-colors"
+                  >
+                    {/* Row 1: Market + Status */}
+                    <div className="flex items-start justify-between mb-2.5">
+                      <div>
+                        <p className="text-sm font-bold text-gray-800">
+                          {bid.marketId?.name || "N/A"}
+                        </p>
+                        <p className="text-[9px] text-gray-400">
+                          {bid.marketId?.marketId || ""}
+                        </p>
+                      </div>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-full bg-gradient-to-r ${statusConfig.color} text-white shadow-sm flex-shrink-0`}
                       >
-                        {/* Market */}
-                        <td className="px-4 py-3">
-                          <p className="text-sm font-bold text-gray-800">
-                            {bid.marketId?.name || "N/A"}
-                          </p>
-                          <p className="text-[9px] text-gray-400">
-                            {bid.marketId?.marketId || ""}
-                          </p>
-                        </td>
+                        <StatusIcon size={10} />
+                        {statusConfig.label}
+                      </span>
+                    </div>
 
-                        {/* Game Type */}
-                        <td className="px-4 py-3">
-                          <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-gray-100 text-gray-700">
-                            {gameTypeDisplay}
+                    {/* Row 2: Game type + Date */}
+                    <div className="flex items-center justify-between mb-2.5">
+                      <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-gray-100 text-gray-700">
+                        {gameTypeDisplay}
+                      </span>
+                      <div className="text-right">
+                        <p className="text-[10px] text-gray-500">
+                          {new Date(bid.createdAt).toLocaleDateString("en-IN", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </p>
+                        <p className="text-[9px] text-gray-400">
+                          {new Date(bid.createdAt).toLocaleTimeString("en-IN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Row 3: Number, Result, Amount */}
+                    <div className="flex items-center justify-between gap-2 bg-gray-50/70 rounded-xl px-3 py-2.5">
+                      {/* Your Number */}
+                      <div>
+                        <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                          Your Number
+                        </p>
+                        {renderNumberBalls(
+                          bid.number,
+                          bid.status,
+                          bid.gameType,
+                          "sm",
+                        )}
+                      </div>
+
+                      {/* Result */}
+                      <div>
+                        <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                          Result
+                        </p>
+                        {isResultDeclared ? (
+                          <div className="flex items-center gap-1">
+                            {getResultDigits(
+                              bid.resultNumber,
+                              bid.gameType,
+                            ).map((digit, index) => (
+                              <div
+                                key={index}
+                                className="w-6 h-6 rounded-full bg-gray-200 border-2 border-gray-300 flex items-center justify-center text-[10px] font-extrabold text-gray-700"
+                              >
+                                {digit}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-gray-400">
+                            Pending
                           </span>
-                        </td>
+                        )}
+                      </div>
 
-                        {/* Your Number */}
-                        <td className="px-4 py-3">
-                          {renderNumberBalls(bid.number, bid.status, "sm")}
-                        </td>
-
-                        {/* Result - Only Winning Number */}
-                        <td className="px-4 py-3">
-                          {isResultDeclared ? (
-                            <div className="flex items-center gap-1">
-                              {getResultDigits(bid.resultNumber).map(
-                                (digit, index) => (
-                                  <div
-                                    key={index}
-                                    className="w-7 h-7 rounded-full bg-gray-200 border-2 border-gray-300 flex items-center justify-center text-xs font-extrabold text-gray-700"
-                                  >
-                                    {digit}
-                                  </div>
-                                ),
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400">
-                              Pending
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Amount */}
-                        <td className="px-4 py-3">
-                          <p className="text-sm font-bold text-gray-700">
-                            {formatCurrency(bid.bidAmount)}
+                      {/* Amount */}
+                      <div className="text-right">
+                        <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                          Amount
+                        </p>
+                        <p className="text-sm font-bold text-gray-700">
+                          {formatCurrency(bid.bidAmount)}
+                        </p>
+                        {bid.winAmount > 0 && (
+                          <p className="text-[10px] font-extrabold text-green-500">
+                            +{formatCurrency(bid.winAmount)}
                           </p>
-                          {bid.winAmount > 0 && (
-                            <p className="text-[10px] font-extrabold text-green-500">
-                              +{formatCurrency(bid.winAmount)}
-                            </p>
-                          )}
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-full bg-gradient-to-r ${statusConfig.color} text-white shadow-sm`}
-                          >
-                            <StatusIcon size={10} />
-                            {statusConfig.label}
-                          </span>
-                        </td>
-
-                        {/* Date */}
-                        <td className="px-4 py-3">
-                          <p className="text-xs text-gray-500">
-                            {new Date(bid.createdAt).toLocaleDateString(
-                              "en-IN",
-                              {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              },
-                            )}
-                          </p>
-                          <p className="text-[9px] text-gray-400">
-                            {new Date(bid.createdAt).toLocaleTimeString(
-                              "en-IN",
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
-                            )}
-                          </p>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Pagination */}
