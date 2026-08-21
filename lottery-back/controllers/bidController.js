@@ -1888,10 +1888,6 @@ exports.adminDeleteBid = async (req, res) => {
   }
 };
 
-// ============================================================
-// ================= DECLARE RESULT & PROCESS BIDS ============
-// ============================================================
-
 // Declare result for a market and process all pending bids
 // ============================================================
 // ================= DECLARE RESULT & PROCESS BIDS ============
@@ -2107,37 +2103,80 @@ exports.getLowestBidNumber = async (req, res) => {
       });
     }
 
-    // Find all pending bids of this market
-    const bids = await Bid.find({
-      marketId: marketId,
-      status: "pending",
-    })
-      .select("number gameType bidAmount userId")
-      .lean();
+    const gameTypes = [
+      "single",
+      "jodi",
+      "panna",
+      "half-sangam",
+      "full-sangam",
+      "last-digit",
+      "first-digit",
+    ];
 
-    if (!bids.length) {
-      return res.status(404).json({
-        success: false,
-        message: "No pending bids found for this market",
-        marketId,
-      });
-    }
+    const result = await Bid.aggregate([
+      {
+        $match: {
+          marketId: new mongoose.Types.ObjectId(marketId),
+          status: "pending",
+          gameType: { $in: gameTypes },
+        },
+      },
 
-    // Convert number to numeric value and find lowest
-    const lowestBid = bids.reduce((lowest, current) => {
-      const lowestNumber = Number(lowest.number);
-      const currentNumber = Number(current.number);
+      {
+        $addFields: {
+          numericNumber: {
+            $convert: {
+              input: "$number",
+              to: "int",
+              onError: null,
+              onNull: null,
+            },
+          },
+        },
+      },
 
-      return currentNumber < lowestNumber ? current : lowest;
+      {
+        $sort: {
+          gameType: 1,
+          numericNumber: 1,
+        },
+      },
+
+      {
+        $group: {
+          _id: "$gameType",
+          number: { $first: "$number" },
+          bidAmount: { $first: "$bidAmount" },
+          userId: { $first: "$userId" },
+        },
+      },
+    ]);
+
+    // Default structure for every game type
+    const lowestBids = {};
+
+    gameTypes.forEach((gameType) => {
+      lowestBids[gameType] = {
+        number: null,
+        bidAmount: 0,
+        userId: null,
+      };
+    });
+
+    // Put aggregation result into response
+    result.forEach((item) => {
+      lowestBids[item._id] = {
+        number: item.number,
+        bidAmount: item.bidAmount,
+        userId: item.userId,
+      };
     });
 
     return res.status(200).json({
       success: true,
       message: "Lowest bid number fetched successfully",
       marketId,
-      lowestNumber: lowestBid.number,
-      gameType: lowestBid.gameType,
-      bidAmount: lowestBid.bidAmount,
+      lowestBids,
     });
   } catch (error) {
     console.error("Get Lowest Bid Error:", error);

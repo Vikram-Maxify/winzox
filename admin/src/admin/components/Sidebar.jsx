@@ -22,6 +22,7 @@ import {
   Shield,
   Globe,
   DollarSign,
+  Calculator,
   TrendingUp,
   Zap,
   Award,
@@ -63,6 +64,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       "/admin/ticketsetiings",
       "/admin/referral-levels",
       "/admin/betting-bonus",
+      "/admin/win-multipliers",
     ];
     if (settingsPaths.includes(location.pathname)) {
       setExpandedMenus(prev => ({ ...prev, settings: true }));
@@ -480,6 +482,11 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: "Betting Bonus",
           path: "/admin/betting-bonus",
           icon: <Gift size={16} />,
+        },
+        {
+          name: "Win Multipliers",
+          path: "/admin/win-multipliers",
+          icon: <Calculator size={16} />,
         },
       ],
     },
