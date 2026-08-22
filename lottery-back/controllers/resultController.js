@@ -10,63 +10,206 @@ const mongoose = require("mongoose");
 
 exports.declareResult = async (req, res) => {
   const session = await mongoose.startSession();
-  session.startTransaction();
 
   try {
-    const { marketId, winningNumbers, resultDate } = req.body;
+    session.startTransaction();
 
-    // ✅ Validate required fields
+    const {
+      marketId,
+      winningNumbers,
+      resultDate,
+      nextOpenDate,
+    } = req.body;
+
+    // ========================================================
+    // VALIDATE MARKET ID
+    // ========================================================
+
     if (!marketId) {
+      await session.abortTransaction();
+      session.endSession();
+
       return res.status(400).json({
         success: false,
         message: "Market ID is required",
       });
     }
 
-    if (!winningNumbers || typeof winningNumbers !== 'object') {
+    // ========================================================
+    // VALIDATE WINNING NUMBERS
+    // ========================================================
+
+    if (
+      !winningNumbers ||
+      typeof winningNumbers !== "object" ||
+      Array.isArray(winningNumbers)
+    ) {
+      await session.abortTransaction();
+      session.endSession();
+
       return res.status(400).json({
         success: false,
         message: "Winning numbers object is required",
       });
     }
 
-    // Find market
-    const market = await Market.findById(marketId).session(session);
+    // ========================================================
+    // VALIDATE NEXT OPEN DATE
+    // ========================================================
+
+    if (!nextOpenDate) {
+      await session.abortTransaction();
+      session.endSession();
+
+      return res.status(400).json({
+        success: false,
+        message: "Next open date is required",
+      });
+    }
+
+    // ========================================================
+    // PARSE RESULT DATE
+    // ========================================================
+
+    const parsedResultDate = resultDate
+      ? new Date(resultDate)
+      : new Date();
+
+    // ========================================================
+    // PARSE NEXT OPEN DATE
+    // ========================================================
+
+    const parsedNextOpenDate =
+      new Date(nextOpenDate);
+
+    // ========================================================
+    // VALIDATE RESULT DATE
+    // ========================================================
+
+    if (
+      Number.isNaN(
+        parsedResultDate.getTime()
+      )
+    ) {
+      await session.abortTransaction();
+      session.endSession();
+
+      return res.status(400).json({
+        success: false,
+        message: "Invalid result date",
+      });
+    }
+
+    // ========================================================
+    // VALIDATE NEXT OPEN DATE
+    // ========================================================
+
+    if (
+      Number.isNaN(
+        parsedNextOpenDate.getTime()
+      )
+    ) {
+      await session.abortTransaction();
+      session.endSession();
+
+      return res.status(400).json({
+        success: false,
+        message: "Invalid next open date",
+      });
+    }
+
+    // ========================================================
+    // CHECK NEXT OPEN DATE
+    // ========================================================
+
+    if (
+      parsedNextOpenDate.getTime() <=
+      parsedResultDate.getTime()
+    ) {
+      await session.abortTransaction();
+      session.endSession();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "Next open date must be after result date",
+      });
+    }
+
+    // ========================================================
+    // FIND MARKET
+    // ========================================================
+
+    const market =
+      await Market.findById(
+        marketId
+      ).session(session);
+
     if (!market) {
       await session.abortTransaction();
       session.endSession();
+
       return res.status(404).json({
         success: false,
         message: "Market not found",
       });
     }
 
+    // ========================================================
+    // CHECK RESULT ALREADY DECLARED
+    // ========================================================
+
     if (market.isResultDeclared) {
       await session.abortTransaction();
       session.endSession();
+
       return res.status(400).json({
         success: false,
-        message: "Result already declared for this market",
+        message:
+          "Result already declared for this market",
       });
     }
 
-    // ✅ Validate and format all winning numbers
+    // ========================================================
+    // VALIDATE + FORMAT WINNING NUMBERS
+    // ========================================================
+
     const formattedWinningNumbers = {};
     const errors = [];
 
-    for (const [gameType, number] of Object.entries(winningNumbers)) {
-      if (number && number.trim() !== '') {
+    for (
+      const [gameType, number]
+      of Object.entries(winningNumbers)
+    ) {
+      if (
+        number !== undefined &&
+        number !== null &&
+        String(number).trim() !== ""
+      ) {
         try {
-          formattedWinningNumbers[gameType] = Result.formatWinningNumber(number, gameType);
+          formattedWinningNumbers[
+            gameType
+          ] =
+            Result.formatWinningNumber(
+              number,
+              gameType
+            );
         } catch (error) {
-          errors.push(`${gameType}: ${error.message}`);
+          errors.push(
+            `${gameType}: ${error.message}`
+          );
         }
       }
     }
 
+    // ========================================================
+    // RETURN NUMBER VALIDATION ERRORS
+    // ========================================================
+
     if (errors.length > 0) {
       await session.abortTransaction();
       session.endSession();
+
       return res.status(400).json({
         success: false,
         message: "Invalid winning numbers",
@@ -74,183 +217,474 @@ exports.declareResult = async (req, res) => {
       });
     }
 
-    // ✅ Find ALL pending bids for this market (all game types)
-    const pendingBids = await Bid.find({
-      marketId,
-      status: "pending",
-    }).session(session);
+    // ========================================================
+    // FIND ALL PENDING BIDS
+    // ========================================================
+
+    const pendingBids =
+      await Bid.find({
+        marketId,
+        status: "pending",
+      }).session(session);
 
     if (pendingBids.length === 0) {
       await session.abortTransaction();
       session.endSession();
+
       return res.status(400).json({
         success: false,
-        message: "No pending bids found for this market",
+        message:
+          "No pending bids found for this market",
       });
     }
 
-    // ✅ Process each bid
+    // ========================================================
+    // PROCESS BIDS
+    // ========================================================
+
     let totalWon = 0;
     let totalLost = 0;
     let totalPayout = 0;
+
     const winningBidsList = [];
+
     const gameTypeStats = {};
 
-    // Initialize game type stats
-    const gameTypes = ['single', 'jodi', 'panna', 'half-sangam', 'full-sangam', 'last-digit', 'first-digit'];
-    for (const type of gameTypes) {
-      gameTypeStats[type] = { won: 0, lost: 0, total: 0 };
+    const gameTypes = [
+      "single",
+      "jodi",
+      "panna",
+      "half-sangam",
+      "full-sangam",
+      "last-digit",
+      "first-digit",
+    ];
+
+    // ========================================================
+    // INITIALIZE GAME TYPE STATS
+    // ========================================================
+
+    for (
+      const type of gameTypes
+    ) {
+      gameTypeStats[type] = {
+        won: 0,
+        lost: 0,
+        total: 0,
+      };
     }
 
-    for (const bid of pendingBids) {
-      // Update game type total
-      if (gameTypeStats[bid.gameType]) {
-        gameTypeStats[bid.gameType].total++;
+    // ========================================================
+    // PROCESS EACH BID
+    // ========================================================
+
+    for (
+      const bid of pendingBids
+    ) {
+      // ------------------------------------------------------
+      // UPDATE GAME TYPE TOTAL
+      // ------------------------------------------------------
+
+      if (
+        gameTypeStats[bid.gameType]
+      ) {
+        gameTypeStats[
+          bid.gameType
+        ].total++;
       }
 
-      // Check if bid wins based on its game type
-      const isWin = checkBidWin(bid, formattedWinningNumbers);
+      // ------------------------------------------------------
+      // CHECK WIN
+      // ------------------------------------------------------
+
+      const isWin =
+        checkBidWin(
+          bid,
+          formattedWinningNumbers
+        );
+
+      // ------------------------------------------------------
+      // WON
+      // ------------------------------------------------------
 
       if (isWin) {
-        // Mark as won
         bid.status = "won";
-        bid.winAmount = bid.possibleWinAmount;
-        bid.wonAt = new Date();
-        bid.resultNumber = formattedWinningNumbers[bid.gameType] || null;
 
-        // Add winnings to user balance
-        const user = await User.findById(bid.userId).session(session);
+        bid.winAmount =
+          bid.possibleWinAmount;
+
+        bid.wonAt =
+          new Date();
+
+        bid.resultNumber =
+          formattedWinningNumbers[
+            bid.gameType
+          ] || null;
+
+        // ----------------------------------------------------
+        // ADD WINNING AMOUNT TO USER BALANCE
+        // ----------------------------------------------------
+
+        const user =
+          await User.findById(
+            bid.userId
+          ).session(session);
+
         if (user) {
-          user.balance += bid.possibleWinAmount;
-          await user.save({ session });
-          totalPayout += bid.possibleWinAmount;
+          user.balance +=
+            bid.possibleWinAmount;
+
+          await user.save({
+            session,
+          });
+
+          totalPayout +=
+            bid.possibleWinAmount;
         }
+
         totalWon++;
-        winningBidsList.push(bid);
-        
-        // Update game type stats
-        if (gameTypeStats[bid.gameType]) {
-          gameTypeStats[bid.gameType].won++;
-        }
-      } else {
-        // Mark as lost
-        bid.status = "lost";
-        bid.lostAt = new Date();
-        bid.resultNumber = formattedWinningNumbers[bid.gameType] || null;
-        totalLost++;
-        
-        // Update game type stats
-        if (gameTypeStats[bid.gameType]) {
-          gameTypeStats[bid.gameType].lost++;
+
+        winningBidsList.push(
+          bid
+        );
+
+        // ----------------------------------------------------
+        // UPDATE GAME TYPE WON
+        // ----------------------------------------------------
+
+        if (
+          gameTypeStats[
+            bid.gameType
+          ]
+        ) {
+          gameTypeStats[
+            bid.gameType
+          ].won++;
         }
       }
 
-      await bid.save({ session });
+      // ------------------------------------------------------
+      // LOST
+      // ------------------------------------------------------
+
+      else {
+        bid.status = "lost";
+
+        bid.lostAt =
+          new Date();
+
+        bid.resultNumber =
+          formattedWinningNumbers[
+            bid.gameType
+          ] || null;
+
+        totalLost++;
+
+        // ----------------------------------------------------
+        // UPDATE GAME TYPE LOST
+        // ----------------------------------------------------
+
+        if (
+          gameTypeStats[
+            bid.gameType
+          ]
+        ) {
+          gameTypeStats[
+            bid.gameType
+          ].lost++;
+        }
+      }
+
+      // ------------------------------------------------------
+      // SAVE BID
+      // ------------------------------------------------------
+
+      await bid.save({
+        session,
+      });
     }
 
-    // ✅ Create Result record
+    // ========================================================
+    // CREATE RESULT RECORD
+    // ========================================================
+
     const resultData = {
-      marketId: market._id,
-      marketName: market.name,
-      winningNumber: formattedWinningNumbers,
-      resultDate: resultDate ? new Date(resultDate) : new Date(),
-      declaredBy: req.user.id,
-      totalBids: pendingBids.length,
-      totalWinningBids: totalWon,
-      totalPayout: totalPayout,
-      status: "declared",
+      marketId:
+        market._id,
+
+      marketName:
+        market.name,
+
+      winningNumber:
+        formattedWinningNumbers,
+
+      resultDate:
+        parsedResultDate,
+
+      nextOpenDate:
+        parsedNextOpenDate,
+
+      declaredBy:
+        req.user.id,
+
+      totalBids:
+        pendingBids.length,
+
+      totalWinningBids:
+        totalWon,
+
+      totalPayout:
+        totalPayout,
+
+      status:
+        "declared",
     };
 
-    const result = await Result.create([resultData], { session });
+    // ========================================================
+    // SAVE RESULT
+    // ========================================================
 
-    // Update market
-    market.isResultDeclared = true;
-    market.resultDeclaredAt = new Date();
-    await market.save({ session });
+    const result =
+      await Result.create(
+        [resultData],
+        {
+          session,
+        }
+      );
+
+    // ========================================================
+    // UPDATE MARKET
+    // ========================================================
+
+    market.isResultDeclared =
+      true;
+
+    market.resultDeclaredAt =
+      new Date();
+
+    await market.save({
+      session,
+    });
+
+    // ========================================================
+    // COMMIT TRANSACTION
+    // ========================================================
 
     await session.commitTransaction();
     session.endSession();
 
-    res.json({
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
+    return res.json({
       success: true,
-      message: "Result declared successfully",
+
+      message:
+        "Result declared successfully",
+
       data: {
         market: {
           id: market._id,
           name: market.name,
         },
-        result: result[0],
+
+        result:
+          result[0],
+
         summary: {
-          totalBidsProcessed: pendingBids.length,
+          totalBidsProcessed:
+            pendingBids.length,
+
           totalWon,
+
           totalLost,
+
           totalPayout,
+
           gameTypeStats,
         },
-        winningBids: winningBidsList.map((b) => ({
-          id: b._id,
-          userId: b.userId,
-          gameType: b.gameType,
-          number: b.number,
-          bidAmount: b.bidAmount,
-          winAmount: b.winAmount,
-        })),
+
+        winningBids:
+          winningBidsList.map(
+            (b) => ({
+              id: b._id,
+
+              userId:
+                b.userId,
+
+              gameType:
+                b.gameType,
+
+              number:
+                b.number,
+
+              bidAmount:
+                b.bidAmount,
+
+              winAmount:
+                b.winAmount,
+            })
+          ),
       },
     });
   } catch (error) {
-    await session.abortTransaction();
+    // ========================================================
+    // ROLLBACK
+    // ========================================================
+
+    try {
+      await session.abortTransaction();
+    } catch (abortError) {
+      console.error(
+        "Transaction Abort Error:",
+        abortError
+      );
+    }
+
     session.endSession();
-    console.error("Declare Result Error:", error);
-    res.status(500).json({
+
+    console.error(
+      "Declare Result Error:",
+      error
+    );
+
+    return res.status(500).json({
       success: false,
-      message: error.message || "Internal server error",
+      message:
+        error.message ||
+        "Internal server error",
     });
   }
 };
 
 // ============================================================
-// ================= HELPER: CHECK BID WIN ===================
+// ================= HELPER: CHECK BID WIN ====================
 // ============================================================
 
-const checkBidWin = (bid, winningNumbers) => {
-  const winningNumber = winningNumbers[bid.gameType];
-  
+const checkBidWin = (
+  bid,
+  winningNumbers
+) => {
+  const winningNumber =
+    winningNumbers[
+      bid.gameType
+    ];
+
   if (!winningNumber) {
     return false;
   }
 
-  const winningNumStr = String(winningNumber).trim();
-  const bidNumStr = String(bid.number).trim();
+  const winningNumStr =
+    String(
+      winningNumber
+    ).trim();
+
+  const bidNumStr =
+    String(
+      bid.number
+    ).trim();
 
   switch (bid.gameType) {
+    // ========================================================
+    // SINGLE
+    // ========================================================
+
     case "single":
-      return winningNumStr === bidNumStr;
-      
+      return (
+        winningNumStr ===
+        bidNumStr
+      );
+
+    // ========================================================
+    // JODI
+    // ========================================================
+
     case "jodi":
-      return winningNumStr === bidNumStr.padStart(2, "0");
-      
+      return (
+        winningNumStr ===
+        bidNumStr.padStart(
+          2,
+          "0"
+        )
+      );
+
+    // ========================================================
+    // PANNA
+    // ========================================================
+
     case "panna":
-      return winningNumStr === bidNumStr.padStart(3, "0");
-      
+      return (
+        winningNumStr ===
+        bidNumStr.padStart(
+          3,
+          "0"
+        )
+      );
+
+    // ========================================================
+    // HALF SANGAM
+    // ========================================================
+
     case "half-sangam":
-      return winningNumStr === bidNumStr || 
-             winningNumStr.slice(-1) === bidNumStr.slice(-1);
-             
+      return (
+        winningNumStr ===
+          bidNumStr ||
+        winningNumStr.slice(-1) ===
+          bidNumStr.slice(-1)
+      );
+
+    // ========================================================
+    // FULL SANGAM
+    // ========================================================
+
     case "full-sangam":
-      return winningNumStr.slice(-2) === bidNumStr.padStart(2, "0");
-      
+      return (
+        winningNumStr.slice(-2) ===
+        bidNumStr.padStart(
+          2,
+          "0"
+        )
+      );
+
+    // ========================================================
+    // LAST DIGIT
+    // ========================================================
+
     case "last-digit": {
-      const bidLastDigit = bidNumStr.slice(-1);
-      const winningLastDigit = winningNumStr.slice(-1);
-      return bidLastDigit === winningLastDigit;
+      const bidLastDigit =
+        bidNumStr.slice(-1);
+
+      const winningLastDigit =
+        winningNumStr.slice(-1);
+
+      return (
+        bidLastDigit ===
+        winningLastDigit
+      );
     }
-    
+
+    // ========================================================
+    // FIRST DIGIT
+    // ========================================================
+
     case "first-digit": {
-      const bidFirstDigit = bidNumStr.charAt(0);
-      const winningFirstDigit = winningNumStr.charAt(0);
-      return bidFirstDigit === winningFirstDigit;
+      const bidFirstDigit =
+        bidNumStr.charAt(0);
+
+      const winningFirstDigit =
+        winningNumStr.charAt(0);
+
+      return (
+        bidFirstDigit ===
+        winningFirstDigit
+      );
     }
-    
+
+    // ========================================================
+    // DEFAULT
+    // ========================================================
+
     default:
       return false;
   }
@@ -260,81 +694,233 @@ const checkBidWin = (bid, winningNumbers) => {
 // ================= GET RESULTS ==============================
 // ============================================================
 
-exports.getResults = async (req, res) => {
+exports.getResults = async (
+  req,
+  res
+) => {
   try {
-    const { marketId, startDate, endDate, page = 1, limit = 20 } = req.query;
+    const {
+      marketId,
+      startDate,
+      endDate,
+      page = 1,
+      limit = 20,
+    } = req.query;
+
+    // ========================================================
+    // FILTER
+    // ========================================================
 
     const filter = {};
-    if (marketId) filter.marketId = marketId;
-    if (startDate || endDate) {
-      filter.resultDate = {};
-      if (startDate) filter.resultDate.$gte = new Date(startDate);
-      if (endDate) filter.resultDate.$lte = new Date(endDate);
+
+    if (marketId) {
+      filter.marketId =
+        marketId;
     }
 
-    const results = await Result.find(filter)
-      .populate("marketId", "name marketId")
-      .populate("declaredBy", "name email")
-      .sort({ resultDate: -1 })
-      .skip((parseInt(page) - 1) * parseInt(limit))
-      .limit(parseInt(limit));
+    if (
+      startDate ||
+      endDate
+    ) {
+      filter.resultDate = {};
 
-    const total = await Result.countDocuments(filter);
+      if (startDate) {
+        filter.resultDate.$gte =
+          new Date(startDate);
+      }
 
-    res.json({
+      if (endDate) {
+        filter.resultDate.$lte =
+          new Date(endDate);
+      }
+    }
+
+    // ========================================================
+    // PAGINATION
+    // ========================================================
+
+    const pageNumber =
+      Math.max(
+        parseInt(page) || 1,
+        1
+      );
+
+    const limitNumber =
+      Math.max(
+        parseInt(limit) || 20,
+        1
+      );
+
+    // ========================================================
+    // GET RESULTS
+    // ========================================================
+
+    const results =
+      await Result.find(
+        filter
+      )
+        .populate(
+          "marketId",
+          "name marketId"
+        )
+        .populate(
+          "declaredBy",
+          "name email"
+        )
+        .sort({
+          resultDate: -1,
+        })
+        .skip(
+          (pageNumber - 1) *
+            limitNumber
+        )
+        .limit(
+          limitNumber
+        );
+
+    // ========================================================
+    // TOTAL
+    // ========================================================
+
+    const total =
+      await Result.countDocuments(
+        filter
+      );
+
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
+    return res.json({
       success: true,
+
       data: results,
+
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page:
+          pageNumber,
+
+        limit:
+          limitNumber,
+
         total,
-        pages: Math.ceil(total / limit),
+
+        pages:
+          Math.ceil(
+            total /
+              limitNumber
+          ),
       },
     });
   } catch (error) {
-    console.error("Get Results Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error(
+      "Get Results Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Internal server error",
+    });
   }
 };
 
 // ============================================================
-// ================= GET RESULT BY ID ========================
+// ================= GET RESULT BY ID =========================
 // ============================================================
 
-exports.getResultById = async (req, res) => {
+exports.getResultById = async (
+  req,
+  res
+) => {
   try {
-    const { resultId } = req.params;
+    const {
+      resultId,
+    } = req.params;
 
-    const result = await Result.findById(resultId)
-      .populate("marketId", "name marketId")
-      .populate("declaredBy", "name email");
+    // ========================================================
+    // FIND RESULT
+    // ========================================================
+
+    const result =
+      await Result.findById(
+        resultId
+      )
+        .populate(
+          "marketId",
+          "name marketId"
+        )
+        .populate(
+          "declaredBy",
+          "name email"
+        );
+
+    // ========================================================
+    // NOT FOUND
+    // ========================================================
 
     if (!result) {
       return res.status(404).json({
         success: false,
-        message: "Result not found",
+        message:
+          "Result not found",
       });
     }
 
-    // Get winning bids for this result
-    const winningBids = await Bid.find({
-      marketId: result.marketId,
-      status: "won",
-    })
-      .populate("userId", "name email mobile")
-      .select("userId gameType number bidAmount winAmount");
+    // ========================================================
+    // GET WINNING BIDS
+    // ========================================================
 
-    res.json({
+    const winningBids =
+      await Bid.find({
+        marketId:
+          result.marketId._id ||
+          result.marketId,
+
+        status: "won",
+      })
+        .populate(
+          "userId",
+          "name email mobile"
+        )
+        .select(
+          "userId gameType number bidAmount winAmount"
+        );
+
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
+    return res.json({
       success: true,
+
       data: {
         result,
+
         winningBids,
-        totalWinners: winningBids.length,
+
+        totalWinners:
+          winningBids.length,
+
+        // Explicit next open date
+        nextOpenDate:
+          result.nextOpenDate,
       },
     });
   } catch (error) {
-    console.error("Get Result By ID Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error(
+      "Get Result By ID Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Internal server error",
+    });
   }
 };
 
@@ -342,27 +928,68 @@ exports.getResultById = async (req, res) => {
 // ================= GET TODAY'S RESULTS =====================
 // ============================================================
 
-exports.getTodayResults = async (req, res) => {
+exports.getTodayResults = async (
+  req,
+  res
+) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today =
+      new Date();
 
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    today.setHours(
+      0,
+      0,
+      0,
+      0
+    );
 
-    const results = await Result.find({
-      resultDate: { $gte: today, $lt: tomorrow },
-    })
-      .populate("marketId", "name marketId")
-      .sort({ resultDate: -1 });
+    const tomorrow =
+      new Date(today);
 
-    res.json({
+    tomorrow.setDate(
+      tomorrow.getDate() + 1
+    );
+
+    // ========================================================
+    // GET TODAY RESULTS
+    // ========================================================
+
+    const results =
+      await Result.find({
+        resultDate: {
+          $gte: today,
+          $lt: tomorrow,
+        },
+      })
+        .populate(
+          "marketId",
+          "name marketId"
+        )
+        .sort({
+          resultDate: -1,
+        });
+
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
+    return res.json({
       success: true,
+
       data: results,
     });
   } catch (error) {
-    console.error("Get Today Results Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error(
+      "Get Today Results Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Internal server error",
+    });
   }
 };
 
@@ -370,74 +997,177 @@ exports.getTodayResults = async (req, res) => {
 // ================= GET RESULT STATISTICS ====================
 // ============================================================
 
-exports.getResultStats = async (req, res) => {
+exports.getResultStats = async (
+  req,
+  res
+) => {
   try {
-    const stats = await Result.aggregate([
-      {
-        $group: {
-          _id: "$marketId",
-          totalResults: { $sum: 1 },
-          totalPayout: { $sum: "$totalPayout" },
-          totalWinningBids: { $sum: "$totalWinningBids" },
-          avgPayout: { $avg: "$totalPayout" },
-        },
-      },
-      {
-        $lookup: {
-          from: "markets",
-          localField: "_id",
-          foreignField: "_id",
-          as: "market",
-        },
-      },
-      {
-        $unwind: "$market",
-      },
-      {
-        $project: {
-          _id: 0,
-          marketId: "$_id",
-          marketName: "$market.name",
-          totalResults: 1,
-          totalPayout: 1,
-          totalWinningBids: 1,
-          avgPayout: { $round: ["$avgPayout", 2] },
-        },
-      },
-      {
-        $sort: { totalResults: -1 },
-      },
-    ]);
+    // ========================================================
+    // MARKET WISE STATS
+    // ========================================================
 
-    // Get overall stats
-    const overallStats = await Result.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalResults: { $sum: 1 },
-          totalPayout: { $sum: "$totalPayout" },
-          totalWinningBids: { $sum: "$totalWinningBids" },
-          totalBids: { $sum: "$totalBids" },
-          avgPayout: { $avg: "$totalPayout" },
-        }
-      }
-    ]);
+    const stats =
+      await Result.aggregate([
+        {
+          $group: {
+            _id: "$marketId",
 
-    res.json({
+            totalResults: {
+              $sum: 1,
+            },
+
+            totalPayout: {
+              $sum: "$totalPayout",
+            },
+
+            totalWinningBids: {
+              $sum:
+                "$totalWinningBids",
+            },
+
+            avgPayout: {
+              $avg:
+                "$totalPayout",
+            },
+          },
+        },
+
+        // ====================================================
+        // LOOKUP MARKET
+        // ====================================================
+
+        {
+          $lookup: {
+            from: "markets",
+
+            localField: "_id",
+
+            foreignField: "_id",
+
+            as: "market",
+          },
+        },
+
+        // ====================================================
+        // UNWIND MARKET
+        // ====================================================
+
+        {
+          $unwind:
+            "$market",
+        },
+
+        // ====================================================
+        // PROJECT
+        // ====================================================
+
+        {
+          $project: {
+            _id: 0,
+
+            marketId:
+              "$_id",
+
+            marketName:
+              "$market.name",
+
+            totalResults: 1,
+
+            totalPayout: 1,
+
+            totalWinningBids: 1,
+
+            avgPayout: {
+              $round: [
+                "$avgPayout",
+                2,
+              ],
+            },
+          },
+        },
+
+        // ====================================================
+        // SORT
+        // ====================================================
+
+        {
+          $sort: {
+            totalResults: -1,
+          },
+        },
+      ]);
+
+    // ========================================================
+    // OVERALL STATS
+    // ========================================================
+
+    const overallStats =
+      await Result.aggregate([
+        {
+          $group: {
+            _id: null,
+
+            totalResults: {
+              $sum: 1,
+            },
+
+            totalPayout: {
+              $sum: "$totalPayout",
+            },
+
+            totalWinningBids: {
+              $sum:
+                "$totalWinningBids",
+            },
+
+            totalBids: {
+              $sum: "$totalBids",
+            },
+
+            avgPayout: {
+              $avg:
+                "$totalPayout",
+            },
+          },
+        },
+      ]);
+
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
+    return res.json({
       success: true,
+
       data: {
-        byMarket: stats,
-        overall: overallStats[0] || {
-          totalResults: 0,
-          totalPayout: 0,
-          totalWinningBids: 0,
-          totalBids: 0,
-          avgPayout: 0,
-        },
+        byMarket:
+          stats,
+
+        overall:
+          overallStats[0] || {
+            totalResults: 0,
+
+            totalPayout: 0,
+
+            totalWinningBids: 0,
+
+            totalBids: 0,
+
+            avgPayout: 0,
+          },
       },
     });
   } catch (error) {
-    console.error("Get Result Stats Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error(
+      "Get Result Stats Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Internal server error",
+    });
   }
 };
