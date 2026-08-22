@@ -1,14 +1,8 @@
-import {
-  ArrowRight,
-  BarChart3,
-  Crown,
-  Sparkles,
-  Trophy,
-  Zap,
-} from "lucide-react";
+import { ArrowRight, BarChart3, Crown, Trophy, Zap } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 // 👇 adjust this path to wherever publicBidSlice actually lives in your project
+import { Link } from "react-router-dom";
 import {
   fetchPublicBidResults,
   selectPublicBidResults,
@@ -117,37 +111,13 @@ export default function AllResultsPage() {
     <div className="min-h-screen bg-gradient-to-b from-amber-50/50 via-white to-white [&_*::-webkit-scrollbar]:hidden [&_*]:[scrollbar-width:none]">
       <div className="max-w-md mx-auto px-3 pb-8 pt-3 space-y-4">
         {/* ===== Hero banner ===== */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0b0d14] via-[#12141c] to-[#0b0d14] px-5 py-6 shadow-lg">
-          <Sparkles className="absolute top-3 left-16 w-4 h-4 text-amber-300/70" />
-          <Sparkles className="absolute top-6 right-24 w-3 h-3 text-amber-300/50" />
-
-          <div className="absolute -top-1 left-3 w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 border-4 border-[#0b0d14] shadow-lg flex items-center justify-center text-white text-xl font-extrabold">
-            7
-          </div>
-          <div className="absolute -top-3 right-2 w-16 h-16 rounded-full bg-gradient-to-br from-red-600 to-red-800 border-4 border-[#0b0d14] shadow-lg flex items-center justify-center text-white text-2xl font-extrabold">
-            9
-          </div>
-          <div className="absolute top-14 right-8 w-11 h-11 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 border-4 border-[#0b0d14] shadow-lg flex items-center justify-center text-white text-base font-extrabold">
-            3
-          </div>
-
-          <div className="relative text-center pt-2">
-            <h1 className="text-3xl font-black tracking-tight bg-gradient-to-b from-amber-200 via-amber-400 to-amber-600 bg-clip-text text-transparent drop-shadow-sm">
-              ALL RESULTS
-            </h1>
-            <h2 className="text-xl font-black bg-gradient-to-b from-amber-200 via-amber-400 to-amber-600 bg-clip-text text-transparent -mt-1">
-              MATKA &amp; POWERBALL
-            </h2>
-            <p className="mt-2 text-[11px] font-medium text-amber-100/70 tracking-wide">
-              All Markets • All Countries • Real Time Updates
-            </p>
-          </div>
-
-          <div className="relative mt-3 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 to-amber-600 flex items-center justify-center shadow">
-              <Crown className="w-4 h-4 text-[#0b0d14]" fill="currentColor" />
-            </div>
-          </div>
+        <div className="relative overflow-hidden">
+          <img
+            src="https://i.ibb.co/S4rcxcKz/banner-1.png"
+            alt="Banner"
+            loading="lazy"
+            className="w-full h-auto object-cover block"
+          />
         </div>
 
         {/* ===== Tab toggle ===== */}
@@ -277,11 +247,14 @@ export default function AllResultsPage() {
             </div>
 
             <div className="p-3">
-              <button className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-gradient-to-b from-amber-400 to-amber-500 text-white text-sm font-extrabold shadow">
+              <Link
+                to={"/chartanalysis"}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-gradient-to-b from-amber-400 to-amber-500 text-white text-sm font-extrabold shadow"
+              >
                 <BarChart3 className="w-4 h-4" />
                 VIEW DETAILED MATKA CHART
                 <ArrowRight className="w-4 h-4" />
-              </button>
+              </Link>
             </div>
           </div>
         )}
