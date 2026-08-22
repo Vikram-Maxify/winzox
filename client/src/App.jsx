@@ -44,6 +44,7 @@ import Maintenance from "./Pages/Maintenance.jsx";
 // Matka Pages
 // ========================================
 import PowerballResults from "./components/PowerballResults.jsx";
+import AllResultsPage from "./Pages/Allresultspage.jsx";
 import BidsHistory from "./Pages/user/BidsHistory.jsx";
 import MatkaDashboard from "./Pages/user/Dashboard.jsx";
 import MatkaMarkets from "./Pages/user/Markets.jsx";
@@ -202,6 +203,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <GameCounts />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/publicresult"
+              element={
+                <ProtectedRoute>
+                  <AllResultsPage />
                 </ProtectedRoute>
               }
             />

@@ -1,0 +1,344 @@
+import {
+  ArrowRight,
+  BarChart3,
+  Crown,
+  Sparkles,
+  Trophy,
+  Zap,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+// 👇 adjust this path to wherever publicBidSlice actually lives in your project
+import {
+  fetchPublicBidResults,
+  selectPublicBidResults,
+} from "../redux/slices/publicBidSlice";
+
+// 🔶 MOCK — Powerball reducer/API not wired yet. Swap for the real slice +
+// thunk once that endpoint exists. Structure kept intentionally similar so
+// the swap is a drop-in later.
+const MOCK_POWERBALL = [
+  {
+    id: "au",
+    country: "AUSTRALIA POWERBALL",
+    drawLabel: "Draw #1423",
+    balls: [12, 23, 31, 36, 44],
+    bonusBall: 7,
+    bonusColor: "bg-purple-600",
+    drawnAt: "10 Aug 2026, 02:30 PM",
+    status: "live",
+  },
+  {
+    id: "us",
+    country: "USA POWERBALL",
+    drawLabel: "Draw #1598",
+    balls: [5, 18, 27, 40, 53],
+    bonusBall: 19,
+    bonusColor: "bg-red-600",
+    drawnAt: "10 Aug 2026, 05:59 AM",
+    status: "live",
+  },
+];
+
+function formatTime(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// 🔶 MOCK — backend doesn't return a "next open" time for a market yet.
+// Placeholder: createdAt + 2 hours, just so the column isn't empty. Swap for
+// the real field (e.g. row.marketId.nextOpenTime) once the API sends it.
+function mockNextOpen(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  d.setHours(d.getHours() + 2);
+  return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+}
+
+function LiveDot({ label = "LIVE" }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600">
+      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+      {label}
+    </span>
+  );
+}
+
+function ResultBall({ n }) {
+  return (
+    <span className="w-7 h-7 rounded-full bg-gradient-to-b from-amber-200 to-amber-300 border border-amber-400/60 text-amber-900 text-xs font-bold flex items-center justify-center shadow-sm">
+      {n}
+    </span>
+  );
+}
+
+function PowerBall({
+  n,
+  colorClass = "bg-gray-100 text-gray-700 border-gray-200",
+}) {
+  return (
+    <span
+      className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center border shadow-sm ${colorClass}`}
+    >
+      {n}
+    </span>
+  );
+}
+
+export default function AllResultsPage() {
+  const [activeTab, setActiveTab] = useState("matka"); // 'matka' | 'powerball'
+  const [activeMarketId, setActiveMarketId] = useState("all");
+
+  const dispatch = useDispatch();
+  const { results, markets, loading, error } = useSelector(
+    selectPublicBidResults,
+  );
+
+  useEffect(() => {
+    dispatch(
+      fetchPublicBidResults({
+        marketId: activeMarketId,
+        status: "won",
+      }),
+    );
+  }, [activeMarketId, dispatch]);
+
+  const marketFilters = useMemo(
+    () => [{ _id: "all", name: "All Markets" }, ...(markets || [])],
+    [markets],
+  );
+
+  const bidRows = results || [];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-amber-50/50 via-white to-white [&_*::-webkit-scrollbar]:hidden [&_*]:[scrollbar-width:none]">
+      <div className="max-w-md mx-auto px-3 pb-8 pt-3 space-y-4">
+        {/* ===== Hero banner ===== */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0b0d14] via-[#12141c] to-[#0b0d14] px-5 py-6 shadow-lg">
+          <Sparkles className="absolute top-3 left-16 w-4 h-4 text-amber-300/70" />
+          <Sparkles className="absolute top-6 right-24 w-3 h-3 text-amber-300/50" />
+
+          <div className="absolute -top-1 left-3 w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 border-4 border-[#0b0d14] shadow-lg flex items-center justify-center text-white text-xl font-extrabold">
+            7
+          </div>
+          <div className="absolute -top-3 right-2 w-16 h-16 rounded-full bg-gradient-to-br from-red-600 to-red-800 border-4 border-[#0b0d14] shadow-lg flex items-center justify-center text-white text-2xl font-extrabold">
+            9
+          </div>
+          <div className="absolute top-14 right-8 w-11 h-11 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 border-4 border-[#0b0d14] shadow-lg flex items-center justify-center text-white text-base font-extrabold">
+            3
+          </div>
+
+          <div className="relative text-center pt-2">
+            <h1 className="text-3xl font-black tracking-tight bg-gradient-to-b from-amber-200 via-amber-400 to-amber-600 bg-clip-text text-transparent drop-shadow-sm">
+              ALL RESULTS
+            </h1>
+            <h2 className="text-xl font-black bg-gradient-to-b from-amber-200 via-amber-400 to-amber-600 bg-clip-text text-transparent -mt-1">
+              MATKA &amp; POWERBALL
+            </h2>
+            <p className="mt-2 text-[11px] font-medium text-amber-100/70 tracking-wide">
+              All Markets • All Countries • Real Time Updates
+            </p>
+          </div>
+
+          <div className="relative mt-3 flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 to-amber-600 flex items-center justify-center shadow">
+              <Crown className="w-4 h-4 text-[#0b0d14]" fill="currentColor" />
+            </div>
+          </div>
+        </div>
+
+        {/* ===== Tab toggle ===== */}
+        <div className="flex bg-white rounded-2xl border border-gray-100 shadow-sm p-1 gap-1">
+          <button
+            onClick={() => setActiveTab("matka")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition ${
+              activeTab === "matka"
+                ? "bg-gradient-to-b from-amber-400 to-amber-500 text-white shadow"
+                : "text-gray-500"
+            }`}
+          >
+            <Crown
+              className="w-4 h-4"
+              fill={activeTab === "matka" ? "currentColor" : "none"}
+            />
+            MATKA RESULTS
+          </button>
+          <button
+            onClick={() => setActiveTab("powerball")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition ${
+              activeTab === "powerball"
+                ? "bg-gradient-to-b from-amber-400 to-amber-500 text-white shadow"
+                : "text-gray-500"
+            }`}
+          >
+            <Zap
+              className="w-4 h-4"
+              fill={activeTab === "powerball" ? "currentColor" : "none"}
+            />
+            POWERBALL RESULTS
+          </button>
+        </div>
+
+        {/* ===== Market filter chips (dynamic, from markets[] in publicBid state) ===== */}
+        {activeTab === "matka" && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {marketFilters.map((m) => (
+              <button
+                key={m._id}
+                onClick={() => setActiveMarketId(m._id)}
+                className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition ${
+                  activeMarketId === m._id
+                    ? "bg-amber-50 border-amber-400 text-amber-700"
+                    : "bg-white border-gray-200 text-gray-500"
+                }`}
+              >
+                {m.name.toUpperCase()}
+              </button>
+            ))}
+            <button className="shrink-0 w-9 h-9 rounded-full bg-gradient-to-b from-amber-400 to-amber-500 flex items-center justify-center shadow">
+              <Trophy className="w-4 h-4 text-white" />
+            </button>
+          </div>
+        )}
+
+        {/* ===== Live Matka Results table — pixel-matched to reference image ===== */}
+        {activeTab === "matka" && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-4 pt-4 pb-3">
+              <div className="flex items-center gap-1.5">
+                <Crown className="w-4 h-4 text-amber-500" fill="currentColor" />
+                <h3 className="text-sm font-extrabold text-gray-900 tracking-tight">
+                  LIVE MATKA RESULTS
+                </h3>
+              </div>
+              <LiveDot />
+            </div>
+
+            <div className="px-4 pb-1 grid grid-cols-[1.1fr_0.8fr_1fr_0.9fr_0.8fr] text-[10px] font-bold text-gray-400 tracking-wide">
+              <span>MARKET</span>
+              <span>TIME</span>
+              <span>RESULT</span>
+              <span>NEXT OPEN</span>
+              <span className="text-right">STATUS</span>
+            </div>
+
+            <div className="mt-1">
+              {loading && (
+                <div className="px-4 py-6 text-center text-xs text-gray-400">
+                  Loading results…
+                </div>
+              )}
+              {error && (
+                <div className="px-4 py-6 text-center text-xs text-red-500">
+                  {error}
+                </div>
+              )}
+              {!loading && !error && bidRows.length === 0 && (
+                <div className="px-4 py-6 text-center text-xs text-gray-400">
+                  No results yet
+                </div>
+              )}
+              {!loading &&
+                !error &&
+                bidRows.map((row, i) => (
+                  <button
+                    key={row._id}
+                    className={`w-full grid grid-cols-[1.1fr_0.8fr_1fr_0.9fr_0.8fr] items-center px-4 py-3 text-left ${
+                      i !== bidRows.length - 1 ? "border-b border-gray-100" : ""
+                    }`}
+                  >
+                    <span className="text-sm font-bold text-gray-900 truncate">
+                      {row.marketId?.name}
+                    </span>
+                    {/* Time = row.createdAt (actual bid/result time from API) */}
+                    <span className="text-xs text-gray-500">
+                      {formatTime(row.createdAt)}
+                    </span>
+                    <span className="flex gap-1">
+                      {String(row.resultNumber)
+                        .split("")
+                        .map((digit, idx) => (
+                          <ResultBall key={idx} n={digit} />
+                        ))}
+                    </span>
+                    {/* Next Open = 🔶 MOCK, backend doesn't send this yet */}
+                    <span className="text-xs text-gray-500">
+                      {mockNextOpen(row.createdAt)}
+                    </span>
+                    <span className="flex items-center justify-end gap-0.5">
+                      <LiveDot />
+                      {/* <ChevronRight className="w-3.5 h-3.5 text-gray-300" /> */}
+                    </span>
+                  </button>
+                ))}
+            </div>
+
+            <div className="p-3">
+              <button className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-gradient-to-b from-amber-400 to-amber-500 text-white text-sm font-extrabold shadow">
+                <BarChart3 className="w-4 h-4" />
+                VIEW DETAILED MATKA CHART
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ===== Powerball Results (still mock — no backend endpoint yet) ===== */}
+        {activeTab === "powerball" && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-amber-500" fill="currentColor" />
+                <h3 className="text-sm font-extrabold text-gray-900 tracking-tight">
+                  POWERBALL RESULTS
+                </h3>
+              </div>
+              <LiveDot />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {MOCK_POWERBALL.map((draw) => (
+                <div
+                  key={draw.id}
+                  className="rounded-2xl border border-gray-100 shadow-sm p-3 flex flex-col items-center text-center gap-2"
+                >
+                  <div>
+                    <p className="text-[11px] font-extrabold text-gray-900 leading-tight">
+                      {draw.country}
+                    </p>
+                    <p className="text-[10px] text-gray-400">
+                      {draw.drawLabel}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-1">
+                    {draw.balls.map((n) => (
+                      <PowerBall key={n} n={n} />
+                    ))}
+                    <PowerBall
+                      n={draw.bonusBall}
+                      colorClass={`${draw.bonusColor} text-white border-transparent`}
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-400">{draw.drawnAt}</p>
+                  <LiveDot />
+                  <button className="w-full flex items-center justify-center gap-1 py-2 rounded-xl border border-amber-400 text-amber-600 text-[11px] font-bold">
+                    VIEW FULL RESULT
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-gradient-to-b from-amber-400 to-amber-500 text-white text-sm font-extrabold shadow">
+              VIEW ALL POWERBALL RESULTS
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
