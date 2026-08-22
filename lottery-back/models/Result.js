@@ -66,6 +66,10 @@ const winningNumbersSchema = new mongoose.Schema(
 
 const resultSchema = new mongoose.Schema(
   {
+    // ======================================================
+    // MARKET
+    // ======================================================
+
     marketId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Market",
@@ -93,6 +97,16 @@ const resultSchema = new mongoose.Schema(
     // ======================================================
 
     resultDate: {
+      type: Date,
+      required: true,
+      index: true,
+    },
+
+    // ======================================================
+    // NEXT OPEN DATE
+    // ======================================================
+
+    nextOpenDate: {
       type: Date,
       required: true,
       index: true,
@@ -173,6 +187,10 @@ resultSchema.index(
 
 resultSchema.index({
   resultDate: -1,
+});
+
+resultSchema.index({
+  nextOpenDate: -1,
 });
 
 resultSchema.index({
@@ -373,13 +391,14 @@ resultSchema.statics.getStats =
   };
 
 // ==========================================================
-// VIRTUAL
+// VIRTUAL: SUMMARY
 // ==========================================================
 
 resultSchema.virtual("summary").get(
   function () {
     return {
       marketId: this.marketId,
+
       marketName: this.marketName,
 
       winningNumber:
@@ -387,6 +406,9 @@ resultSchema.virtual("summary").get(
 
       resultDate:
         this.resultDate,
+
+      nextOpenDate:
+        this.nextOpenDate,
 
       totalBids:
         this.totalBids,
@@ -397,7 +419,8 @@ resultSchema.virtual("summary").get(
       totalPayout:
         this.totalPayout,
 
-      status: this.status,
+      status:
+        this.status,
     };
   }
 );

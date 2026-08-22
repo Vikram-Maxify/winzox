@@ -96,6 +96,9 @@ const AdminResults = () => {
       "first-digit": "",
     },
     resultDate: new Date().toISOString().split("T")[0],
+    nextOpenDate: new Date(Date.now() + 86400000)
+      .toISOString()
+      .split("T")[0],
   });
 
   // =========================
@@ -240,10 +243,24 @@ const AdminResults = () => {
       return;
     }
 
+    if (!formData.nextOpenDate) {
+      alert("Please select next open date");
+      return;
+    }
+
+    if (
+      new Date(formData.nextOpenDate) <=
+      new Date(formData.resultDate)
+    ) {
+      alert("Next open date must be after result date");
+      return;
+    }
+
     const payload = {
       marketId: formData.marketId,
       winningNumbers: formData.winningNumbers,
       resultDate: formData.resultDate,
+      nextOpenDate: formData.nextOpenDate,
     };
 
     try {
@@ -269,6 +286,9 @@ const AdminResults = () => {
             "first-digit": "",
           },
           resultDate: new Date().toISOString().split("T")[0],
+          nextOpenDate: new Date(Date.now() + 86400000)
+            .toISOString()
+            .split("T")[0],
         });
       }
     } catch (error) {
@@ -308,6 +328,9 @@ const AdminResults = () => {
         "first-digit": "",
       },
       resultDate: new Date().toISOString().split("T")[0],
+      nextOpenDate: new Date(Date.now() + 86400000)
+        .toISOString()
+        .split("T")[0],
     });
   };
 
@@ -817,7 +840,10 @@ const AdminResults = () => {
                   </th>
 
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Date
+                    Result Date
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Next Open
                   </th>
                 </tr>
               </thead>
@@ -868,6 +894,21 @@ const AdminResults = () => {
                       {result.resultDate
                         ? new Date(
                             result.resultDate
+                          ).toLocaleDateString(
+                            "en-IN",
+                            {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            }
+                          )
+                        : "-"}
+                    </td>
+
+                    <td className="px-4 py-3 text-sm font-medium text-blue-600">
+                      {result.nextOpenDate
+                        ? new Date(
+                            result.nextOpenDate
                           ).toLocaleDateString(
                             "en-IN",
                             {
@@ -1158,6 +1199,27 @@ const AdminResults = () => {
                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                     required
                   />
+                </div>
+
+                {/* ================= NEXT OPEN DATE ================= */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Next Open Date *
+                  </label>
+
+                  <input
+                    type="date"
+                    name="nextOpenDate"
+                    value={formData.nextOpenDate}
+                    min={formData.resultDate}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    required
+                  />
+
+                  <p className="text-xs text-gray-400 mt-1">
+                    Select the date when this market will open next.
+                  </p>
                 </div>
               </div>
 
