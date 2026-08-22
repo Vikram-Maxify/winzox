@@ -38,7 +38,7 @@ const bidSchema = new mongoose.Schema(
       validate: {
         validator: function (value) {
           const str = String(value).trim();
-          
+
           switch (this.gameType) {
             case "single":
               // Single: 0-9
@@ -74,7 +74,7 @@ const bidSchema = new mongoose.Schema(
               return false;
           }
         },
-        message: function(props) {
+        message: function (props) {
           const gameTypeMap = {
             'single': 'single digit (0-9)',
             'jodi': '2-digit number (00-99)',
@@ -124,6 +124,12 @@ const bidSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    nextOpenDate: {
+      type: Date,
+      required: true,
+      index: true,
+    },
+
 
     remarks: {
       type: String,
@@ -144,12 +150,12 @@ bidSchema.index({ userId: 1, status: 1 });
 bidSchema.index({ marketId: 1, createdAt: -1 });
 
 // Virtual field for display
-bidSchema.virtual('numberDisplay').get(function() {
+bidSchema.virtual('numberDisplay').get(function () {
   return this.number;
 });
 
 // Pre-save middleware to format number
-bidSchema.pre('save', function(next) {
+bidSchema.pre('save', function (next) {
   // Format number with leading zeros for 2-digit games
   if (['jodi', 'full-sangam', 'last-digit', 'first-digit'].includes(this.gameType)) {
     this.number = String(this.number).trim().padStart(2, '0');
@@ -161,48 +167,48 @@ bidSchema.pre('save', function(next) {
 });
 
 // Method to check if bid won
-bidSchema.methods.checkWin = function(winningNumber) {
+bidSchema.methods.checkWin = function (winningNumber) {
   const winningNumStr = String(winningNumber).trim();
   const bidNumStr = String(this.number).trim();
-  
+
   switch (this.gameType) {
     case 'single':
       return winningNumStr === bidNumStr;
-      
+
     case 'jodi':
       return winningNumStr === bidNumStr;
-      
+
     case 'panna':
       return winningNumStr === bidNumStr;
-      
+
     case 'half-sangam':
       // Check if either 1-digit or 3-digit matches
-      return winningNumStr === bidNumStr || 
-             winningNumStr.slice(-1) === bidNumStr.slice(-1);
-             
+      return winningNumStr === bidNumStr ||
+        winningNumStr.slice(-1) === bidNumStr.slice(-1);
+
     case 'full-sangam':
       // Check last 2 digits
       return winningNumStr.slice(-2) === bidNumStr;
-      
+
     case 'last-digit':
       // Check if last digit matches
       const bidLastDigit = bidNumStr.slice(-1);
       const winningLastDigit = winningNumStr.slice(-1);
       return bidLastDigit === winningLastDigit;
-      
+
     case 'first-digit':
       // Check if first digit matches
       const bidFirstDigit = bidNumStr.charAt(0);
       const winningFirstDigit = winningNumStr.charAt(0);
       return bidFirstDigit === winningFirstDigit;
-      
+
     default:
       return false;
   }
 };
 
 // Static method to get bid statistics
-bidSchema.statics.getStats = async function(userId) {
+bidSchema.statics.getStats = async function (userId) {
   const stats = await this.aggregate([
     {
       $match: { userId: mongoose.Types.ObjectId(userId) }
