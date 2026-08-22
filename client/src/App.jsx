@@ -45,6 +45,7 @@ import Maintenance from "./Pages/Maintenance.jsx";
 // ========================================
 import PowerballResults from "./components/PowerballResults.jsx";
 import AllResultsPage from "./Pages/Allresultspage.jsx";
+import MatkaChartAnalysis from "./Pages/Matkachartanalysis.jsx";
 import BidsHistory from "./Pages/user/BidsHistory.jsx";
 import MatkaDashboard from "./Pages/user/Dashboard.jsx";
 import MatkaMarkets from "./Pages/user/Markets.jsx";
@@ -211,6 +212,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AllResultsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/chartanalysis"
+              element={
+                <ProtectedRoute>
+                  <MatkaChartAnalysis />
                 </ProtectedRoute>
               }
             />
