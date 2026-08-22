@@ -126,7 +126,6 @@ const bidSchema = new mongoose.Schema(
     },
     nextOpenDate: {
       type: Date,
-      required: true,
       index: true,
     },
 
