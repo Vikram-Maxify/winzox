@@ -68,16 +68,12 @@ exports.declareResult = async (req, res) => {
     }
 
     // ========================================================
-    // PARSE RESULT DATE
+    // PARSE DATES
     // ========================================================
 
     const parsedResultDate = resultDate
       ? new Date(resultDate)
       : new Date();
-
-    // ========================================================
-    // PARSE NEXT OPEN DATE
-    // ========================================================
 
     const parsedNextOpenDate =
       new Date(nextOpenDate);
@@ -119,7 +115,7 @@ exports.declareResult = async (req, res) => {
     }
 
     // ========================================================
-    // CHECK NEXT OPEN DATE
+    // NEXT OPEN MUST BE AFTER RESULT DATE
     // ========================================================
 
     if (
@@ -171,7 +167,7 @@ exports.declareResult = async (req, res) => {
     }
 
     // ========================================================
-    // VALIDATE + FORMAT WINNING NUMBERS
+    // FORMAT WINNING NUMBERS
     // ========================================================
 
     const formattedWinningNumbers = {};
@@ -187,9 +183,7 @@ exports.declareResult = async (req, res) => {
         String(number).trim() !== ""
       ) {
         try {
-          formattedWinningNumbers[
-            gameType
-          ] =
+          formattedWinningNumbers[gameType] =
             Result.formatWinningNumber(
               number,
               gameType
@@ -203,7 +197,7 @@ exports.declareResult = async (req, res) => {
     }
 
     // ========================================================
-    // RETURN NUMBER VALIDATION ERRORS
+    // NUMBER VALIDATION ERROR
     // ========================================================
 
     if (errors.length > 0) {
@@ -264,9 +258,7 @@ exports.declareResult = async (req, res) => {
     // INITIALIZE GAME TYPE STATS
     // ========================================================
 
-    for (
-      const type of gameTypes
-    ) {
+    for (const type of gameTypes) {
       gameTypeStats[type] = {
         won: 0,
         lost: 0,
@@ -275,19 +267,15 @@ exports.declareResult = async (req, res) => {
     }
 
     // ========================================================
-    // PROCESS EACH BID
+    // PROCESS EVERY BID
     // ========================================================
 
-    for (
-      const bid of pendingBids
-    ) {
+    for (const bid of pendingBids) {
       // ------------------------------------------------------
-      // UPDATE GAME TYPE TOTAL
+      // TOTAL GAME TYPE BIDS
       // ------------------------------------------------------
 
-      if (
-        gameTypeStats[bid.gameType]
-      ) {
+      if (gameTypeStats[bid.gameType]) {
         gameTypeStats[
           bid.gameType
         ].total++;
@@ -297,15 +285,14 @@ exports.declareResult = async (req, res) => {
       // CHECK WIN
       // ------------------------------------------------------
 
-      const isWin =
-        checkBidWin(
-          bid,
-          formattedWinningNumbers
-        );
+      const isWin = checkBidWin(
+        bid,
+        formattedWinningNumbers
+      );
 
-      // ------------------------------------------------------
+      // ======================================================
       // WON
-      // ------------------------------------------------------
+      // ======================================================
 
       if (isWin) {
         bid.status = "won";
@@ -313,16 +300,15 @@ exports.declareResult = async (req, res) => {
         bid.winAmount =
           bid.possibleWinAmount;
 
-        bid.wonAt =
-          new Date();
+        bid.wonAt = new Date();
 
         bid.resultNumber =
           formattedWinningNumbers[
-          bid.gameType
+            bid.gameType
           ] || null;
 
         // ----------------------------------------------------
-        // ADD WINNING AMOUNT TO USER BALANCE
+        // GET USER
         // ----------------------------------------------------
 
         const user =
@@ -344,18 +330,14 @@ exports.declareResult = async (req, res) => {
 
         totalWon++;
 
-        winningBidsList.push(
-          bid
-        );
+        winningBidsList.push(bid);
 
         // ----------------------------------------------------
-        // UPDATE GAME TYPE WON
+        // GAME TYPE WON
         // ----------------------------------------------------
 
         if (
-          gameTypeStats[
-          bid.gameType
-          ]
+          gameTypeStats[bid.gameType]
         ) {
           gameTypeStats[
             bid.gameType
@@ -363,31 +345,28 @@ exports.declareResult = async (req, res) => {
         }
       }
 
-      // ------------------------------------------------------
+      // ======================================================
       // LOST
-      // ------------------------------------------------------
+      // ======================================================
 
       else {
         bid.status = "lost";
 
-        bid.lostAt =
-          new Date();
+        bid.lostAt = new Date();
 
         bid.resultNumber =
           formattedWinningNumbers[
-          bid.gameType
+            bid.gameType
           ] || null;
 
         totalLost++;
 
         // ----------------------------------------------------
-        // UPDATE GAME TYPE LOST
+        // GAME TYPE LOST
         // ----------------------------------------------------
 
         if (
-          gameTypeStats[
-          bid.gameType
-          ]
+          gameTypeStats[bid.gameType]
         ) {
           gameTypeStats[
             bid.gameType
@@ -395,9 +374,17 @@ exports.declareResult = async (req, res) => {
         }
       }
 
-      // ------------------------------------------------------
+      // ======================================================
+      // IMPORTANT FIX
+      // SET NEXT OPEN DATE BEFORE SAVE
+      // ======================================================
+
+      bid.nextOpenDate =
+        parsedNextOpenDate;
+
+      // ======================================================
       // SAVE BID
-      // ------------------------------------------------------
+      // ======================================================
 
       await bid.save({
         session,
@@ -405,15 +392,13 @@ exports.declareResult = async (req, res) => {
     }
 
     // ========================================================
-    // CREATE RESULT RECORD
+    // CREATE RESULT
     // ========================================================
 
     const resultData = {
-      marketId:
-        market._id,
+      marketId: market._id,
 
-      marketName:
-        market.name,
+      marketName: market.name,
 
       winningNumber:
         formattedWinningNumbers,
@@ -436,8 +421,7 @@ exports.declareResult = async (req, res) => {
       totalPayout:
         totalPayout,
 
-      status:
-        "declared",
+      status: "declared",
     };
 
     // ========================================================
@@ -453,7 +437,10 @@ exports.declareResult = async (req, res) => {
       );
 
     // ========================================================
-    // UPDATE ALL BIDS NEXT OPEN DATE
+    // UPDATE ALL MARKET BIDS
+    //
+    // This also handles any existing bids which may not have
+    // received nextOpenDate before.
     // ========================================================
 
     await Bid.updateMany(
@@ -462,7 +449,8 @@ exports.declareResult = async (req, res) => {
       },
       {
         $set: {
-          nextOpenDate: parsedNextOpenDate,
+          nextOpenDate:
+            parsedNextOpenDate,
         },
       },
       {
@@ -507,8 +495,14 @@ exports.declareResult = async (req, res) => {
           name: market.name,
         },
 
-        result:
-          result[0],
+        result: result[0],
+
+        // Explicit dates
+        resultDate:
+          parsedResultDate,
+
+        nextOpenDate:
+          parsedNextOpenDate,
 
         summary: {
           totalBidsProcessed:
@@ -525,23 +519,26 @@ exports.declareResult = async (req, res) => {
 
         winningBids:
           winningBidsList.map(
-            (b) => ({
-              id: b._id,
+            (bid) => ({
+              id: bid._id,
 
               userId:
-                b.userId,
+                bid.userId,
 
               gameType:
-                b.gameType,
+                bid.gameType,
 
               number:
-                b.number,
+                bid.number,
 
               bidAmount:
-                b.bidAmount,
+                bid.bidAmount,
 
               winAmount:
-                b.winAmount,
+                bid.winAmount,
+
+              nextOpenDate:
+                parsedNextOpenDate,
             })
           ),
       },
@@ -577,7 +574,7 @@ exports.declareResult = async (req, res) => {
 };
 
 // ============================================================
-// ================= HELPER: CHECK BID WIN ====================
+// ================= CHECK BID WIN ============================
 // ============================================================
 
 const checkBidWin = (
@@ -586,10 +583,14 @@ const checkBidWin = (
 ) => {
   const winningNumber =
     winningNumbers[
-    bid.gameType
+      bid.gameType
     ];
 
-  if (!winningNumber) {
+  if (
+    winningNumber === undefined ||
+    winningNumber === null ||
+    winningNumber === ""
+  ) {
     return false;
   }
 
@@ -647,9 +648,9 @@ const checkBidWin = (
     case "half-sangam":
       return (
         winningNumStr ===
-        bidNumStr ||
+          bidNumStr ||
         winningNumStr.slice(-1) ===
-        bidNumStr.slice(-1)
+          bidNumStr.slice(-1)
       );
 
     // ========================================================
@@ -725,16 +726,20 @@ exports.getResults = async (
       limit = 20,
     } = req.query;
 
-    // ========================================================
-    // FILTER
-    // ========================================================
-
     const filter = {};
+
+    // ========================================================
+    // MARKET FILTER
+    // ========================================================
 
     if (marketId) {
       filter.marketId =
         marketId;
     }
+
+    // ========================================================
+    // DATE FILTER
+    // ========================================================
 
     if (
       startDate ||
@@ -748,8 +753,19 @@ exports.getResults = async (
       }
 
       if (endDate) {
-        filter.resultDate.$lte =
+        const end =
           new Date(endDate);
+
+        // Include complete end date
+        end.setHours(
+          23,
+          59,
+          59,
+          999
+        );
+
+        filter.resultDate.$lte =
+          end;
       }
     }
 
@@ -790,7 +806,7 @@ exports.getResults = async (
         })
         .skip(
           (pageNumber - 1) *
-          limitNumber
+            limitNumber
         )
         .limit(
           limitNumber
@@ -826,7 +842,7 @@ exports.getResults = async (
         pages:
           Math.ceil(
             total /
-            limitNumber
+              limitNumber
           ),
       },
     });
@@ -858,10 +874,6 @@ exports.getResultById = async (
       resultId,
     } = req.params;
 
-    // ========================================================
-    // FIND RESULT
-    // ========================================================
-
     const result =
       await Result.findById(
         resultId
@@ -875,10 +887,6 @@ exports.getResultById = async (
           "name email"
         );
 
-    // ========================================================
-    // NOT FOUND
-    // ========================================================
-
     if (!result) {
       return res.status(404).json({
         success: false,
@@ -888,14 +896,21 @@ exports.getResultById = async (
     }
 
     // ========================================================
+    // MARKET ID
+    // ========================================================
+
+    const resultMarketId =
+      result.marketId?._id ||
+      result.marketId;
+
+    // ========================================================
     // GET WINNING BIDS
     // ========================================================
 
     const winningBids =
       await Bid.find({
         marketId:
-          result.marketId._id ||
-          result.marketId,
+          resultMarketId,
 
         status: "won",
       })
@@ -904,7 +919,7 @@ exports.getResultById = async (
           "name email mobile"
         )
         .select(
-          "userId gameType number bidAmount winAmount"
+          "userId gameType number bidAmount winAmount nextOpenDate"
         );
 
     // ========================================================
@@ -922,7 +937,6 @@ exports.getResultById = async (
         totalWinners:
           winningBids.length,
 
-        // Explicit next open date
         nextOpenDate:
           result.nextOpenDate,
       },
@@ -943,7 +957,7 @@ exports.getResultById = async (
 };
 
 // ============================================================
-// ================= GET TODAY'S RESULTS =====================
+// ================= GET TODAY RESULTS ========================
 // ============================================================
 
 exports.getTodayResults = async (
@@ -968,10 +982,6 @@ exports.getTodayResults = async (
       tomorrow.getDate() + 1
     );
 
-    // ========================================================
-    // GET TODAY RESULTS
-    // ========================================================
-
     const results =
       await Result.find({
         resultDate: {
@@ -986,10 +996,6 @@ exports.getTodayResults = async (
         .sort({
           resultDate: -1,
         });
-
-    // ========================================================
-    // RESPONSE
-    // ========================================================
 
     return res.json({
       success: true,
@@ -1050,10 +1056,6 @@ exports.getResultStats = async (
           },
         },
 
-        // ====================================================
-        // LOOKUP MARKET
-        // ====================================================
-
         {
           $lookup: {
             from: "markets",
@@ -1066,18 +1068,10 @@ exports.getResultStats = async (
           },
         },
 
-        // ====================================================
-        // UNWIND MARKET
-        // ====================================================
-
         {
           $unwind:
             "$market",
         },
-
-        // ====================================================
-        // PROJECT
-        // ====================================================
 
         {
           $project: {
@@ -1103,10 +1097,6 @@ exports.getResultStats = async (
             },
           },
         },
-
-        // ====================================================
-        // SORT
-        // ====================================================
 
         {
           $sort: {
