@@ -318,7 +318,7 @@ exports.declareResult = async (req, res) => {
 
         bid.resultNumber =
           formattedWinningNumbers[
-            bid.gameType
+          bid.gameType
           ] || null;
 
         // ----------------------------------------------------
@@ -354,7 +354,7 @@ exports.declareResult = async (req, res) => {
 
         if (
           gameTypeStats[
-            bid.gameType
+          bid.gameType
           ]
         ) {
           gameTypeStats[
@@ -375,7 +375,7 @@ exports.declareResult = async (req, res) => {
 
         bid.resultNumber =
           formattedWinningNumbers[
-            bid.gameType
+          bid.gameType
           ] || null;
 
         totalLost++;
@@ -386,7 +386,7 @@ exports.declareResult = async (req, res) => {
 
         if (
           gameTypeStats[
-            bid.gameType
+          bid.gameType
           ]
         ) {
           gameTypeStats[
@@ -451,6 +451,24 @@ exports.declareResult = async (req, res) => {
           session,
         }
       );
+
+    // ========================================================
+    // UPDATE ALL BIDS NEXT OPEN DATE
+    // ========================================================
+
+    await Bid.updateMany(
+      {
+        marketId: market._id,
+      },
+      {
+        $set: {
+          nextOpenDate: parsedNextOpenDate,
+        },
+      },
+      {
+        session,
+      }
+    );
 
     // ========================================================
     // UPDATE MARKET
@@ -568,7 +586,7 @@ const checkBidWin = (
 ) => {
   const winningNumber =
     winningNumbers[
-      bid.gameType
+    bid.gameType
     ];
 
   if (!winningNumber) {
@@ -629,9 +647,9 @@ const checkBidWin = (
     case "half-sangam":
       return (
         winningNumStr ===
-          bidNumStr ||
+        bidNumStr ||
         winningNumStr.slice(-1) ===
-          bidNumStr.slice(-1)
+        bidNumStr.slice(-1)
       );
 
     // ========================================================
@@ -772,7 +790,7 @@ exports.getResults = async (
         })
         .skip(
           (pageNumber - 1) *
-            limitNumber
+          limitNumber
         )
         .limit(
           limitNumber
@@ -808,7 +826,7 @@ exports.getResults = async (
         pages:
           Math.ceil(
             total /
-              limitNumber
+            limitNumber
           ),
       },
     });
